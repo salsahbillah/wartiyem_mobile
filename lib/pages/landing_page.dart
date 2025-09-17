@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 class LandingPage extends StatelessWidget {
+  const LandingPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -23,9 +25,9 @@ class LandingPage extends StatelessWidget {
               const SizedBox(height: 10),
 
               // Teks tagline
-              Text(
+              const Text(
                 "Urusan Lapar?\nKami Siap Antar!",
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
