@@ -40,7 +40,7 @@ class LandingPage extends StatelessWidget {
 
               // Gambar ilustrasi
               Image.asset(
-                "assets/images/delivery.png", // ganti sesuai nama file
+                "assets/images/logo_kedai.png", // ganti sesuai nama file
                 height: 200,
               ),
 
