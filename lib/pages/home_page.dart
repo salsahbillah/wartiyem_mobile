@@ -12,7 +12,7 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   int selectedCategory = 0;
 
-  // 🖼️ Data kategori dengan gambar
+  // 🖼️ Data kategori
   final List<Map<String, String>> kategoriMenu = [
     {"name": "Paket Nasi Liwet", "image": "assets/images/nasii.png"},
     {"name": "Aneka Mie", "image": "assets/images/buket.png"},
@@ -216,9 +216,10 @@ class _HomePageState extends State<HomePage> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
+                // ✅ ubah aspect ratio biar card lebih tinggi
                 childAspectRatio: 0.72,
                 crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+                mainAxisSpacing: 16,
               ),
               itemCount: menuRekomendasi.length,
               itemBuilder: (context, index) {
@@ -240,7 +241,7 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       // Gambar placeholder
                       Container(
-                        height: 110,
+                        height: 90, // ✅ kecilin gambar biar muat
                         decoration: BoxDecoration(
                           borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(15)),
@@ -248,23 +249,23 @@ class _HomePageState extends State<HomePage> {
                         ),
                         child: const Center(
                           child: Icon(Icons.fastfood,
-                              size: 50, color: Colors.white),
+                              size: 40, color: Colors.white),
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(6),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(menu["nama"],
                                 style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.bold, fontSize: 14)),
+                                    fontWeight: FontWeight.bold, fontSize: 13)),
                             Text(menu["deskripsi"],
-                                style: GoogleFonts.poppins(fontSize: 12)),
+                                style: GoogleFonts.poppins(fontSize: 11)),
                             Text(
                               "${menu["harga"]}",
                               style: GoogleFonts.poppins(
-                                fontSize: 14,
+                                fontSize: 13,
                                 color: Colors.red.shade700,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -272,7 +273,7 @@ class _HomePageState extends State<HomePage> {
                             Text(
                               menu["status"],
                               style: GoogleFonts.poppins(
-                                fontSize: 12,
+                                fontSize: 11,
                                 color: menu["status"] == "Habis"
                                     ? Colors.red
                                     : Colors.green,
@@ -293,11 +294,11 @@ class _HomePageState extends State<HomePage> {
                                       child: Container(
                                         decoration: const BoxDecoration(
                                           shape: BoxShape.circle,
-                                          color: Color(0xFF800000), // merah marun
+                                          color: Color(0xFF800000),
                                         ),
-                                        padding: const EdgeInsets.all(8),
+                                        padding: const EdgeInsets.all(6),
                                         child: const Icon(Icons.add,
-                                            color: Colors.white, size: 20),
+                                            color: Colors.white, size: 18),
                                       ),
                                     ),
                                   )
@@ -306,7 +307,7 @@ class _HomePageState extends State<HomePage> {
                                     children: [
                                       IconButton(
                                         icon: const Icon(Icons.remove_circle,
-                                            color: Colors.red),
+                                            color: Colors.red, size: 20),
                                         onPressed: () {
                                           setState(() {
                                             if (menu["qty"] > 0) menu["qty"]--;
@@ -315,10 +316,10 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                       Text("${menu["qty"]}",
                                           style: GoogleFonts.poppins(
-                                              fontSize: 14)),
+                                              fontSize: 13)),
                                       IconButton(
                                         icon: const Icon(Icons.add_circle,
-                                            color: Colors.green),
+                                            color: Colors.green, size: 20),
                                         onPressed: () {
                                           setState(() {
                                             menu["qty"]++;
