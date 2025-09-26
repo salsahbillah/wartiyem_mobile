@@ -41,6 +41,15 @@ class _HomePageState extends State<HomePage> {
     },
   ];
 
+  // 🔢 Hitung total item dalam keranjang
+  int get totalCartItems {
+    int total = 0;
+    for (var menu in menuRekomendasi) {
+      total += menu["qty"] as int;
+    }
+    return total;
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -55,9 +64,10 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔍 Search + Button Masuk
+            // 🔍 Search + Cart
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              padding: const EdgeInsets.only(
+                  top: 32, left: 16, right: 16, bottom: 20), // 🔥 lebih turun
               child: Row(
                 children: [
                   Expanded(
@@ -71,17 +81,42 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                  const SizedBox(width: 12),
+                  // 🛒 Ikon keranjang + Badge
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      InkWell(
+                        onTap: () {
+                          // Arahkan ke halaman keranjang nanti
+                        },
+                        child: const Icon(
+                          Icons.shopping_cart,
+                          color: Color(0xFF800000), // merah marun
+                          size: 38, // 🔥 diperbesar biar proporsional
+                        ),
                       ),
-                    ),
-                    onPressed: () {},
-                    child: const Text("Masuk",
-                        style: TextStyle(color: Colors.white)),
+                      if (totalCartItems > 0)
+                        Positioned(
+                          right: -6,
+                          top: -6,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              "$totalCartItems",
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -216,8 +251,7 @@ class _HomePageState extends State<HomePage> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                // ✅ ubah aspect ratio biar card lebih tinggi
-                childAspectRatio: 0.72,
+                childAspectRatio: 0.65,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 16,
               ),
@@ -241,7 +275,7 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       // Gambar placeholder
                       Container(
-                        height: 90, // ✅ kecilin gambar biar muat
+                        height: 90,
                         decoration: BoxDecoration(
                           borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(15)),
@@ -252,83 +286,87 @@ class _HomePageState extends State<HomePage> {
                               size: 40, color: Colors.white),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(menu["nama"],
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(menu["nama"],
+                                  style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13)),
+                              Text(menu["deskripsi"],
+                                  style: GoogleFonts.poppins(fontSize: 11)),
+                              Text(
+                                "${menu["harga"]}",
                                 style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.bold, fontSize: 13)),
-                            Text(menu["deskripsi"],
-                                style: GoogleFonts.poppins(fontSize: 11)),
-                            Text(
-                              "${menu["harga"]}",
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: Colors.red.shade700,
-                                fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Colors.red.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            Text(
-                              menu["status"],
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: menu["status"] == "Habis"
-                                    ? Colors.red
-                                    : Colors.green,
+                              Text(
+                                menu["status"],
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: menu["status"] == "Habis"
+                                      ? Colors.red
+                                      : Colors.green,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-
-                            // 🔥 Tombol Qty
-                            menu["qty"] == 0
-                                ? Align(
-                                    alignment: Alignment.centerRight,
-                                    child: InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          menu["qty"] = 1;
-                                        });
-                                      },
-                                      child: Container(
-                                        decoration: const BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: Color(0xFF800000),
+                              const Spacer(),
+                              // 🔥 Tombol Qty
+                              menu["qty"] == 0
+                                  ? Align(
+                                      alignment: Alignment.centerRight,
+                                      child: InkWell(
+                                        onTap: () {
+                                          setState(() {
+                                            menu["qty"] = 1;
+                                          });
+                                        },
+                                        child: Container(
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Color(0xFF800000),
+                                          ),
+                                          padding: const EdgeInsets.all(6),
+                                          child: const Icon(Icons.add,
+                                              color: Colors.white, size: 18),
                                         ),
-                                        padding: const EdgeInsets.all(6),
-                                        child: const Icon(Icons.add,
-                                            color: Colors.white, size: 18),
                                       ),
-                                    ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove_circle,
-                                            color: Colors.red, size: 20),
-                                        onPressed: () {
-                                          setState(() {
-                                            if (menu["qty"] > 0) menu["qty"]--;
-                                          });
-                                        },
-                                      ),
-                                      Text("${menu["qty"]}",
-                                          style: GoogleFonts.poppins(
-                                              fontSize: 13)),
-                                      IconButton(
-                                        icon: const Icon(Icons.add_circle,
-                                            color: Colors.green, size: 20),
-                                        onPressed: () {
-                                          setState(() {
-                                            menu["qty"]++;
-                                          });
-                                        },
-                                      ),
-                                    ],
-                                  )
-                          ],
+                                    )
+                                  : Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.remove_circle,
+                                              color: Colors.red, size: 20),
+                                          onPressed: () {
+                                            setState(() {
+                                              if (menu["qty"] > 0) {
+                                                menu["qty"]--;
+                                              }
+                                            });
+                                          },
+                                        ),
+                                        Text("${menu["qty"]}",
+                                            style: GoogleFonts.poppins(
+                                                fontSize: 13)),
+                                        IconButton(
+                                          icon: const Icon(Icons.add_circle,
+                                              color: Colors.green, size: 20),
+                                          onPressed: () {
+                                            setState(() {
+                                              menu["qty"]++;
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    )
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -339,13 +377,6 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 80),
           ],
         ),
-      ),
-
-      // 🛒 Floating Cart
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.red,
-        onPressed: () {},
-        child: const Icon(Icons.shopping_cart, color: Colors.white),
       ),
 
       // 📌 Bottom Navbar

@@ -50,18 +50,18 @@ class LandingPage extends StatelessWidget {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 60, vertical: 15),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 60, vertical: 15),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
                   elevation: 5,
                 ),
                 onPressed: () {
-                  Navigator.pushNamed(context, "/home");
+                  Navigator.pushNamed(context, "/login"); // 🔥 arahkan ke login
                 },
                 child: const Text(
-                  "MULAI",
+                  "MULAI PESAN",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
