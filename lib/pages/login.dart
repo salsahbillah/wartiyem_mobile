@@ -84,7 +84,7 @@ class LoginPage extends StatelessWidget {
                 const Text("Belum Memiliki Akun? "),
                 GestureDetector(
                   onTap: () {
-                    // Aksi untuk pindah ke halaman daftar
+                    Navigator.pushNamed(context, "/regist");
                   },
                   child: const Text(
                     "Daftar Sekarang",
