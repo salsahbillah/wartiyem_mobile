@@ -6,18 +6,16 @@ class TentangKamiPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Tentang Kami", style: GoogleFonts.poppins()),
-        backgroundColor: Colors.red,
-      ),
-      body: const Padding(
-        padding: EdgeInsets.all(16),
-        child: Text(
-          "Aplikasi Wartiyem Mobile dibuat untuk memudahkan kamu "
-          "pesan makanan favorit tanpa ribet!",
-          style: TextStyle(fontSize: 16),
-          textAlign: TextAlign.center,
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Text(
+            "Aplikasi Wartiyem Mobile dibuat untuk memudahkan kamu "
+            "pesan makanan favorit tanpa ribet!",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(fontSize: 16),
+          ),
         ),
       ),
     );

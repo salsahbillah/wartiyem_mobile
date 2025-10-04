@@ -6,13 +6,15 @@ class PesananPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Pesanan", style: GoogleFonts.poppins()),
-        backgroundColor: Colors.red,
-      ),
-      body: const Center(
-        child: Text("Halaman Pesanan Kamu"),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Text(
+            "Halaman Pesanan Kamu",
+            style: GoogleFonts.poppins(fontSize: 16),
+          ),
+        ),
       ),
     );
   }

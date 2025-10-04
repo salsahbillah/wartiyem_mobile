@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  final VoidCallback onRegisterSuccess;
+
+  const RegisterPage({super.key, required this.onRegisterSuccess});
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -20,17 +22,17 @@ class _RegisterPageState extends State<RegisterPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Gambar di atas (contoh dari assets)
+              // 🖼️ Gambar Ilustrasi
               SizedBox(
                 height: 180,
                 child: Image.asset(
-                  "assets/images/delivery.png", // ganti sesuai path asset gambar
+                  "assets/images/delivery.png",
                   fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Judul
+              // 📝 Judul
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -44,23 +46,23 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 20),
 
-              // Input Nama Pengguna
+              // 👤 Input Nama Pengguna
               _buildTextField("Nama Pengguna"),
               const SizedBox(height: 16),
 
-              // Input Nomor Telepon
+              // 📞 Input Nomor Telepon
               _buildTextField("Nomor Telepon", keyboardType: TextInputType.phone),
               const SizedBox(height: 16),
 
-              // Input Buat Kata Sandi
+              // 🔐 Buat Kata Sandi
               _buildTextField("Buat Kata Sandi", isPassword: true),
               const SizedBox(height: 16),
 
-              // Input Konfirmasi Kata Sandi
+              // 🔐 Konfirmasi Kata Sandi
               _buildTextField("Konfirmasi Kata Sandi", isPassword: true),
               const SizedBox(height: 20),
 
-              // Checkbox Syarat & Ketentuan
+              // ✅ Checkbox Syarat
               Row(
                 children: [
                   Checkbox(
@@ -93,7 +95,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 20),
 
-              // Tombol Daftar
+              // 🔘 Tombol Daftar
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -104,11 +106,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  onPressed: agree
-                      ? () {
-                          Navigator.pushNamed(context, "/login");
-                        }
-                      : null,
+                  onPressed: agree ? widget.onRegisterSuccess : null,
                   child: const Text(
                     "Daftar",
                     style: TextStyle(

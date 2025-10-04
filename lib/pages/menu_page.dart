@@ -6,13 +6,15 @@ class MenuPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Menu", style: GoogleFonts.poppins()),
-        backgroundColor: Colors.red,
-      ),
-      body: const Center(
-        child: Text("Daftar Menu Akan Muncul di sini"),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Text(
+            "Daftar Menu Akan Muncul di sini",
+            style: GoogleFonts.poppins(fontSize: 16),
+          ),
+        ),
       ),
     );
   }
