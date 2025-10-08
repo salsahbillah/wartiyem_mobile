@@ -45,10 +45,16 @@ class LandingPage extends StatelessWidget {
                   ),
                   elevation: 5,
                 ),
-                onPressed: onLoginSuccess, // ⬅️ Panggil callback
+                onPressed: () {
+                  Navigator.pushNamed(context, '/login');
+                },
                 child: const Text(
                   "MULAI PESAN",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],

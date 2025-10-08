@@ -8,7 +8,8 @@ class TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 32, left: 16, right: 16, bottom: 20),
+      padding:
+          const EdgeInsets.only(top: 32, left: 16, right: 16, bottom: 20),
       child: Row(
         children: [
           // 🔍 Search bar
@@ -31,7 +32,9 @@ class TopBar extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               InkWell(
-                onTap: () {},
+                onTap: () {
+                  Navigator.pushNamed(context, '/cart'); // 👈 ke halaman keranjang
+                },
                 child: Image.asset(
                   'assets/images/cart.png',
                   width: 36,
@@ -45,7 +48,7 @@ class TopBar extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: const BoxDecoration(
-                      color: Color.fromARGB(255, 192, 0, 0), // 💥 Maroon
+                      color: Color.fromARGB(255, 192, 0, 0),
                       shape: BoxShape.circle,
                     ),
                     child: Text(
@@ -65,8 +68,7 @@ class TopBar extends StatelessWidget {
 
           // 👤 Profil circle dengan huruf P
           InkWell(
-            onTap: () {
-            },
+            onTap: () {},
             child: CircleAvatar(
               backgroundColor: Colors.red.shade900,
               radius: 18,

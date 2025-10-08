@@ -6,6 +6,8 @@ import 'pages/home_page.dart';
 import 'pages/menu_page.dart';
 import 'pages/pesanan_page.dart';
 import 'pages/tentang_kami_page.dart';
+import 'pages/cart_page.dart'; // ✅ Ganti dari keranjang_page.dart
+import 'pages/order_page.dart'; // ✅ Ganti dari pesan_page.dart
 import 'widgets/navbar.dart';
 
 void main() {
@@ -22,30 +24,39 @@ class MyApp extends StatelessWidget {
       title: 'Wartiyem Mobile',
       initialRoute: '/',
       routes: {
+        // 🟡 Landing Page
         '/': (context) => LandingPage(
-              onLoginSuccess: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const MainController()),
-              ),
+              onLoginSuccess: () =>
+                  Navigator.pushReplacementNamed(context, '/login'),
             ),
+
+        // 🟢 Login
         '/login': (context) => LoginPage(
               onLoginSuccess: () => Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const MainController()),
               ),
             ),
+
+        // 🔵 Register
         '/regist': (context) => RegisterPage(
               onRegisterSuccess: () => Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const MainController()),
               ),
             ),
+
+        // 🛒 Cart Page
+        '/cart': (context) => const CartPage(), // ✅ ganti dari /keranjang
+
+        // 📦 Order Page
+        '/order': (context) => const OrderPage(), // ✅ ganti dari /pesan
       },
     );
   }
 }
 
-// 👇 Pengontrol navigasi utama setelah login
+// 👇 Controller utama setelah login
 class MainController extends StatefulWidget {
   const MainController({super.key});
 

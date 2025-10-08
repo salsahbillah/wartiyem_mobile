@@ -29,6 +29,7 @@ class _HomePageState extends State<HomePage> {
       "status": "Habis",
       "rating": 4.2,
       "qty": 0,
+      "imagePath": "assets/images/tes.png",
     },
     {
       "nama": "SEAFOOD BOIL",
@@ -37,6 +38,25 @@ class _HomePageState extends State<HomePage> {
       "status": "Tersedia",
       "rating": 4.1,
       "qty": 2,
+      "imagePath": "assets/images/tes.png",
+    },
+    {
+      "nama": "MIE GORENG SPESIAL",
+      "deskripsi": "mie, telur, ayam",
+      "harga": 18000,
+      "status": "Tersedia",
+      "rating": 4.5,
+      "qty": 0,
+      "imagePath": "assets/images/tes.png",
+    },
+    {
+      "nama": "NASI TUTUG",
+      "deskripsi": "nasi, sambal, ayam",
+      "harga": 22000,
+      "status": "Tersedia",
+      "rating": 4.6,
+      "qty": 1,
+      "imagePath": "assets/images/tes.png",
     },
   ];
 
@@ -200,6 +220,8 @@ class _HomePageState extends State<HomePage> {
                 harga: menu["harga"],
                 status: menu["status"],
                 qty: menu["qty"],
+                rating: menu["rating"],
+                imagePath: menu["imagePath"],
                 onAdd: () {
                   setState(() {
                     menu["qty"]++;
