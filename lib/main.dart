@@ -6,8 +6,9 @@ import 'pages/home_page.dart';
 import 'pages/menu_page.dart';
 import 'pages/pesanan_page.dart';
 import 'pages/tentang_kami_page.dart';
-import 'pages/cart_page.dart'; // ✅ Ganti dari keranjang_page.dart
-import 'pages/order_page.dart'; // ✅ Ganti dari pesan_page.dart
+import 'pages/cart_page.dart';
+import 'pages/order_page.dart';
+import 'pages/struk_page.dart'; // ✅ Tambahkan import untuk halaman struk
 import 'widgets/navbar.dart';
 
 void main() {
@@ -22,6 +23,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Wartiyem Mobile',
+      theme: ThemeData(
+        scaffoldBackgroundColor: Colors.white,
+        primarySwatch: Colors.red,
+      ),
       initialRoute: '/',
       routes: {
         // 🟡 Landing Page
@@ -46,11 +51,14 @@ class MyApp extends StatelessWidget {
               ),
             ),
 
-        // 🛒 Cart Page
-        '/cart': (context) => const CartPage(), // ✅ ganti dari /keranjang
+        // 🛒 Keranjang
+        '/cart': (context) => const CartPage(),
 
-        // 📦 Order Page
-        '/order': (context) => const OrderPage(), // ✅ ganti dari /pesan
+        // 📦 Order (Konfirmasi Pesanan)
+        '/order': (context) => const OrderPage(),
+
+        // 🧾 Struk (Bukti Pesanan)
+        '/struk': (context) => const StrukPage(), // ✅ Tambahkan ini
       },
     );
   }
