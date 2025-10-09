@@ -277,7 +277,10 @@ class _OrderPageState extends State<OrderPage> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  // Navigasi ke halaman Struk
+                  Navigator.pushNamed(context, '/struk');
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   shape: RoundedRectangleBorder(
