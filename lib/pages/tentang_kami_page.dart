@@ -6,6 +6,7 @@ class TentangKamiPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ignore: prefer_const_declarations
     final redColor = const Color(0xFFE63946);
 
     return Scaffold(
@@ -167,11 +168,11 @@ class TentangKamiPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Wrap(
+                  const Wrap(
                     alignment: WrapAlignment.center,
                     spacing: 15,
                     runSpacing: 15,
-                    children: const [
+                    children: [
                       _KeunggulanItem(text: "✔️ Cepat & Praktis"),
                       _KeunggulanItem(text: "✔️ Rasa Autentik"),
                       _KeunggulanItem(text: "✔️ Pemesanan Digital"),
@@ -287,11 +288,11 @@ class TentangKamiPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 40),
-                  Wrap(
+                  const Wrap(
                     alignment: WrapAlignment.center,
                     spacing: 30,
                     runSpacing: 30,
-                    children: const [
+                    children: [
                       _TeamCard(
                         image: 'assets/images/om.jpeg',
                         name: 'Eka Dava Fadilah Juliansah',

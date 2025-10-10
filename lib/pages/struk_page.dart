@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'pesanan_page.dart'; // ✅ tambahkan import ini
 
 class StrukPage extends StatelessWidget {
   const StrukPage({super.key});
@@ -28,7 +29,7 @@ class StrukPage extends StatelessWidget {
         centerTitle: true,
       ),
 
-      body: SingleChildScrollView( // ✅ biar bisa di-scroll
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -160,7 +161,15 @@ class StrukPage extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      // ✅ Navigasi ke halaman PesananPage
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PesananPage(),
+                        ),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       shape: RoundedRectangleBorder(

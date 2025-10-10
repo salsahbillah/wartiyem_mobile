@@ -72,19 +72,19 @@ class _CartPageState extends State<CartPage> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             "NASI LIWET AYAM GORENG",
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          const Text(
+                          SizedBox(height: 4),
+                          Text(
                             "nasi, ayam,\nlalapan, sambel",
                             style: TextStyle(
                               fontSize: 12,
@@ -92,8 +92,8 @@ class _CartPageState extends State<CartPage> {
                               height: 1.3,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          const Text(
+                          SizedBox(height: 4),
+                          Text(
                             "Rp 20.000",
                             style: TextStyle(
                               color: Colors.red,
