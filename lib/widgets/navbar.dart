@@ -47,14 +47,14 @@ class BottomNavbar extends StatelessWidget {
                   Icon(
                     item['icon'] as IconData,
                     size: 24,
-                    color: iconColor, 
+                    color: const Color.fromARGB(255, 150, 0, 0), 
                   ),
                   const SizedBox(height: 2),
                   Text(
                     item['label'] as String,
                     style: TextStyle(
                       fontSize: 10,
-                      color: iconColor,
+                      color: const Color.fromARGB(255, 150, 0, 0),
                       // Membuat label terpilih menjadi bold
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, 
                     ),
