@@ -58,7 +58,7 @@ class MyApp extends StatelessWidget {
         '/order': (context) => const OrderPage(),
 
         // 🧾 Struk (Bukti Pesanan)
-        '/struk': (context) => const StrukPage(), // ✅ Tambahkan ini
+        '/struk': (context) => const StrukPage(order: {},), // ✅ Tambahkan ini
       },
     );
   }

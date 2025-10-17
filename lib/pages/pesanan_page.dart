@@ -1,37 +1,103 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'struk_page.dart';
 
-class PesananPage extends StatelessWidget {
+class PesananPage extends StatefulWidget {
   const PesananPage({super.key});
 
   @override
+  State<PesananPage> createState() => _PesananPageState();
+}
+
+class _PesananPageState extends State<PesananPage> {
+  List<dynamic> orders = [];
+  bool isLoading = true;
+  String? errorMessage;
+
+  static const String apiBaseUrl =
+      'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/order/user';
+
+  @override
+  void initState() {
+    super.initState();
+    fetchOrders();
+  }
+
+  Future<void> fetchOrders() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      if (token == null) {
+        setState(() {
+          errorMessage = 'Anda belum login.';
+          isLoading = false;
+        });
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse(apiBaseUrl),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          orders = data['data'];
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          errorMessage = 'Gagal memuat data pesanan (${response.statusCode})';
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Terjadi kesalahan: $e';
+        isLoading = false;
+      });
+    }
+  }
+
+  String formatCurrency(num number) {
+    return "Rp ${number.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => '.')}";
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> orders = [
-      {
-        "tanggal": "25/09/2025 • 20:13",
-        "pesanan": "AYAM x3",
-        "pembayaran": "Tunai",
-        "layanan": "Bungkus",
-        "total": "Rp 66.000",
-        "status": "Selesai"
-      },
-      {
-        "tanggal": "25/09/2025 • 19:50",
-        "pesanan": "NAILONG",
-        "pembayaran": "Tunai",
-        "layanan": "Bungkus",
-        "total": "Rp 27.500",
-        "status": "Menunggu Konfirmasi"
-      },
-      {
-        "tanggal": "25/09/2025 • 20:13",
-        "pesanan": "AYAM x3",
-        "pembayaran": "Tunai",
-        "layanan": "Bungkus",
-        "total": "Rp 66.000",
-        "status": "Selesai"
-      },
-    ];
+    if (isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF9F9F9),
+        body: Center(child: CircularProgressIndicator(color: Colors.red)),
+      );
+    }
+
+    if (errorMessage != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF9F9F9),
+        appBar: AppBar(
+          title: const Text(
+            "Riwayat Pesanan",
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.white,
+          elevation: 1,
+          iconTheme: const IconThemeData(color: Colors.black),
+        ),
+        body: Center(
+          child: Text(
+            errorMessage!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.black54, fontSize: 16),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
@@ -50,6 +116,11 @@ class PesananPage extends StatelessWidget {
         itemCount: orders.length,
         itemBuilder: (context, index) {
           final order = orders[index];
+          final items = order["items"] as List<dynamic>? ?? [];
+          final pesananText = items.map((item) => item["name"]).join(", ");
+          final status = (order["status"] ?? "").toString().toLowerCase();
+          final tanggal = order["createdAt"] ?? "";
+
           return Card(
             margin: const EdgeInsets.only(bottom: 16),
             shape: RoundedRectangleBorder(
@@ -62,7 +133,7 @@ class PesananPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    order["tanggal"],
+                    tanggal.replaceAll("T", " • ").substring(0, 16),
                     style: const TextStyle(
                       fontSize: 13,
                       color: Colors.black87,
@@ -70,94 +141,33 @@ class PesananPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  RichText(
-                    text: TextSpan(
-                      style: const TextStyle(color: Colors.black, fontSize: 14),
-                      children: [
-                        const TextSpan(
-                          text: "Pesanan: ",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        TextSpan(text: order["pesanan"]),
-                      ],
-                    ),
-                  ),
+                  Text("Pesanan: $pesananText"),
                   Text(
-                    "Pembayaran: ${order["pembayaran"]}   |   Layanan: ${order["layanan"]}",
+                    "Pembayaran: ${order["payment"] ?? '-'} | Layanan: ${order["method"] ?? '-'}",
                     style: const TextStyle(fontSize: 13),
                   ),
-                  const SizedBox(height: 4),
                   Text(
-                    "Total: ${order["total"]}",
+                    "Total: ${formatCurrency(order["totalAmount"] ?? 0)}",
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                        fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                  const SizedBox(height: 4),
-
-                  if (order["status"] == "Menunggu Konfirmasi") ...[
-                    const Row(
-                      children: [
-                        Icon(Icons.info_outline, size: 16, color: Colors.grey),
-                        SizedBox(width: 4),
-                        Text(
-                          "Menunggu Konfirmasi",
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-
+                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
-                            // ✅ Kirim data order ke StrukPage
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const StrukPage(), // ✅ ini aman buat UI dulu
+                                builder: (context) => StrukPage(order: order),
                               ),
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red[800],
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
+                            backgroundColor: Colors.red,
                           ),
-                          child: const Text(
-                            "Lihat Detail",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          child: const Text(
-                            "Beri Rating",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: const Text("Lihat Detail"),
                         ),
                       ),
                     ],
