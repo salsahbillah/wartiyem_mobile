@@ -1,9 +1,55 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
-class LoginPage extends StatelessWidget {
+class LoginPage extends StatefulWidget {
   final VoidCallback onLoginSuccess;
 
   const LoginPage({super.key, required this.onLoginSuccess});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  bool isLoading = false;
+
+  Future<void> loginUser() async {
+    setState(() => isLoading = true);
+
+    // 🔗 URL dari ngrok kamu (ganti endpoint sesuai backend)
+    const String apiUrl =
+        'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/user/login';
+
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': emailController.text,
+          'password': passwordController.text,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        widget.onLoginSuccess();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message'] ?? 'Login gagal')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan koneksi: $e')),
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,22 +61,30 @@ class LoginPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Masuk", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.red)),
+            const Text("Masuk",
+                style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red)),
             const SizedBox(height: 30),
             TextField(
+              controller: emailController,
               decoration: InputDecoration(
                 hintText: "Email",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4.0)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(4.0)),
                 filled: true,
                 fillColor: Colors.white,
               ),
             ),
             const SizedBox(height: 16),
             TextField(
+              controller: passwordController,
               obscureText: true,
               decoration: InputDecoration(
                 hintText: "Password Akun",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4.0)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(4.0)),
                 filled: true,
                 fillColor: Colors.white,
               ),
@@ -42,10 +96,19 @@ class LoginPage extends StatelessWidget {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red[800],
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  shape:
+                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                 ),
-                onPressed: onLoginSuccess, // ⬅️ Panggil callback
-                child: const Text("Masuk", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                onPressed: isLoading ? null : loginUser,
+                child: isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        "Masuk",
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
+                      ),
               ),
             ),
             const SizedBox(height: 20),
@@ -57,7 +120,11 @@ class LoginPage extends StatelessWidget {
                   onTap: () {
                     Navigator.pushNamed(context, "/regist");
                   },
-                  child: const Text("Daftar Sekarang", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    "Daftar Sekarang",
+                    style:
+                        TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             )
