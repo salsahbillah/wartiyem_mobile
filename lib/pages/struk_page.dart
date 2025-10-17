@@ -1,188 +1,111 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'pesanan_page.dart'; // ✅ tambahkan import ini
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 
 class StrukPage extends StatelessWidget {
-  const StrukPage({super.key});
+  final Map<String, dynamic> order;
+  const StrukPage({super.key, required this.order});
+
+  Future<void> generatePDF(BuildContext context) async {
+    final pdf = pw.Document();
+
+    final items = (order["items"] as List<dynamic>)
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    final subtotal =
+        items.fold<double>(0, (sum, item) => sum + (item["price"] * item["qty"]));
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Center(
+                    child: pw.Text("KEDAI WARTIYEM",
+                        style: pw.TextStyle(
+                            fontSize: 20, fontWeight: pw.FontWeight.bold))),
+                pw.SizedBox(height: 20),
+                pw.Text("Kode Pesanan: ${order["id"] ?? '-'}"),
+                pw.Text("Tanggal: ${order["createdAt"] ?? '-'}"),
+                pw.SizedBox(height: 10),
+                pw.Divider(),
+                pw.SizedBox(height: 10),
+                ...items.map((item) {
+                  final total = item["price"] * item["qty"];
+                  return pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text("${item["name"]} x${item["qty"]}"),
+                      pw.Text("Rp ${total.toStringAsFixed(0)}"),
+                    ],
+                  );
+                }),
+                pw.Divider(),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text("TOTAL",
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    pw.Text("Rp ${subtotal.toStringAsFixed(0)}",
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    final output = await getTemporaryDirectory();
+    final file = File("${output.path}/struk_${order["id"]}.pdf");
+    await file.writeAsBytes(await pdf.save());
+    await OpenFile.open(file.path);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final items = (order["items"] as List<dynamic>)
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+
     return Scaffold(
-      backgroundColor: Colors.white,
-
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-        title: Text(
-          "Struk Pembelian",
-          style: GoogleFonts.poppins(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
+        title: const Text("Struk Pembelian"),
+        backgroundColor: Colors.red,
       ),
-
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              "KEDAI WARTIYEM",
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
+            Text("Kode Pesanan: ${order["id"] ?? '-'}",
+                style: GoogleFonts.poppins(fontSize: 16)),
+            const Divider(),
+            Expanded(
+              child: ListView(
+                children: items
+                    .map((item) => ListTile(
+                          title: Text(item["name"]),
+                          subtitle: Text("Qty: ${item["qty"]}"),
+                          trailing: Text(
+                              "Rp ${(item["price"] * item["qty"]).toStringAsFixed(0)}"),
+                        ))
+                    .toList(),
               ),
             ),
-            Text(
-              "Jl. Ampera No.57, Rt/Rw 002/023 Bulak,\nKec. Jatibarang, Kabupaten Indramayu,\nJawa Barat 45273\nNo.Telp: 0813955878510",
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(fontSize: 13),
-            ),
-            const SizedBox(height: 10),
-            const Divider(thickness: 1, color: Colors.black54),
-            const SizedBox(height: 10),
-
-            // Info pesanan
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("25-09-2025", style: GoogleFonts.poppins(fontSize: 13)),
-                Text("20:13 WIB", style: GoogleFonts.poppins(fontSize: 13)),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Kode Pesanan", style: GoogleFonts.poppins(fontSize: 13)),
-                Text("2CB2E3", style: GoogleFonts.poppins(fontSize: 13)),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text("caca",
-                style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600, fontSize: 15)),
-            const SizedBox(height: 10),
-            const Divider(thickness: 1, color: Colors.black54),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("NASI LIWET AYAM GORENG",
-                    style: GoogleFonts.poppins(fontSize: 14)),
-                Text("Rp 20.000", style: GoogleFonts.poppins(fontSize: 14)),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Total QTY : 1", style: GoogleFonts.poppins(fontSize: 13)),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Subtotal", style: GoogleFonts.poppins(fontSize: 14)),
-                Text("Rp 20.000", style: GoogleFonts.poppins(fontSize: 14)),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Biaya Layanan (10%)",
-                    style: GoogleFonts.poppins(fontSize: 14)),
-                Text("Rp 2.000", style: GoogleFonts.poppins(fontSize: 14)),
-              ],
-            ),
-            const Divider(thickness: 1, color: Colors.black54),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("TOTAL",
-                    style: GoogleFonts.poppins(
-                        fontSize: 15, fontWeight: FontWeight.w700)),
-                Text("Rp 22.000",
-                    style: GoogleFonts.poppins(
-                        fontSize: 15, fontWeight: FontWeight.w700)),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Metode Pemesanan",
-                    style: GoogleFonts.poppins(fontSize: 14)),
-                Text("Bungkus", style: GoogleFonts.poppins(fontSize: 14)),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Tunai", style: GoogleFonts.poppins(fontSize: 14)),
-                Text("Rp 22.000", style: GoogleFonts.poppins(fontSize: 14)),
-              ],
-            ),
-            const SizedBox(height: 15),
-            Text(
-              "Terima kasih atas transaksi Anda",
-              style: GoogleFonts.poppins(
-                fontStyle: FontStyle.italic,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Tombol bawah
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.download, color: Colors.white),
-                    label: Text("Unduh Struk",
-                        style: GoogleFonts.poppins(color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    onPressed: () {},
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // ✅ Navigasi ke halaman PesananPage
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PesananPage(),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Text(
-                      "Lihat Riwayat Pesanan",
-                      style: GoogleFonts.poppins(color: Colors.white),
-                    ),
-                  ),
-                ),
-              ],
+            ElevatedButton.icon(
+              icon: const Icon(Icons.download),
+              label: const Text("Unduh Struk"),
+              onPressed: () => generatePDF(context),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             ),
           ],
         ),
