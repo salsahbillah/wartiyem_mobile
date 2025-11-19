@@ -52,8 +52,13 @@ class MyApp extends StatelessWidget {
         // 📦 Konfirmasi Pesanan
         '/order': (context) => const OrderPage(),
 
+<<<<<<< HEAD
         // 🧾 Struk Pesanan
         '/struk': (context) => const StrukPage(),
+=======
+        // 🧾 Struk (Bukti Pesanan)
+        '/struk': (context) => const StrukPage(order: {},), // ✅ Tambahkan ini
+>>>>>>> f9fa6dc2edc21ccbcdbd5e516c964061639bd245
       },
     );
   }
