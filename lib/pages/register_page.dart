@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class RegisterPage extends StatefulWidget {
-  final VoidCallback onRegisterSuccess; // ✅ Tambahkan callback agar cocok dengan main.dart
-
-  const RegisterPage({super.key, required this.onRegisterSuccess});
+  const RegisterPage({super.key});
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -38,11 +36,12 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (response.statusCode == 200 && data['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registrasi berhasil!')),
+          const SnackBar(content: Text('Registrasi berhasil! Silakan login.')),
         );
 
-        // ✅ Panggil callback sukses (menuju MainController)
-        widget.onRegisterSuccess();
+        // 👉 Setelah registrasi berhasil, langsung ke halaman login
+        Navigator.pushReplacementNamed(context, "/login");
+
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(data['message'] ?? 'Registrasi gagal')),

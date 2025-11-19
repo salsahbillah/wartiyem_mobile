@@ -8,7 +8,7 @@ import 'pages/pesanan_page.dart';
 import 'pages/tentang_kami_page.dart';
 import 'pages/cart_page.dart';
 import 'pages/order_page.dart';
-import 'pages/struk_page.dart'; // ✅ Tambahkan import untuk halaman struk
+import 'pages/struk_page.dart';
 import 'widgets/navbar.dart';
 
 void main() {
@@ -35,7 +35,7 @@ class MyApp extends StatelessWidget {
                   Navigator.pushReplacementNamed(context, '/login'),
             ),
 
-        // 🟢 Login
+        // 🟢 Login Page
         '/login': (context) => LoginPage(
               onLoginSuccess: () => Navigator.pushReplacement(
                 context,
@@ -43,28 +43,25 @@ class MyApp extends StatelessWidget {
               ),
             ),
 
-        // 🔵 Register
-        '/regist': (context) => RegisterPage(
-              onRegisterSuccess: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const MainController()),
-              ),
-            ),
+        // 🔵 Register Page — FIXED (tanpa callback)
+        '/regist': (context) => const RegisterPage(),
 
         // 🛒 Keranjang
         '/cart': (context) => const CartPage(),
 
-        // 📦 Order (Konfirmasi Pesanan)
+        // 📦 Konfirmasi Pesanan
         '/order': (context) => const OrderPage(),
 
-        // 🧾 Struk (Bukti Pesanan)
-        '/struk': (context) => const StrukPage(), // ✅ Tambahkan ini
+        // 🧾 Struk Pesanan
+        '/struk': (context) => const StrukPage(),
       },
     );
   }
 }
 
+// ============================================================
 // 👇 Controller utama setelah login
+// ============================================================
 class MainController extends StatefulWidget {
   const MainController({super.key});
 
