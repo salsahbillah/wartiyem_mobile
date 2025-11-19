@@ -30,14 +30,6 @@ class _PesananPageState extends State<PesananPage> {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString('token');
 
-      if (token == null) {
-        setState(() {
-          errorMessage = 'Anda belum login.';
-          isLoading = false;
-        });
-        return;
-      }
-
       final response = await http.get(
         Uri.parse(apiBaseUrl),
         headers: {'Authorization': 'Bearer $token'},
