@@ -51,15 +51,24 @@ class MenuCard extends StatelessWidget {
               ClipRRect(
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(15)),
-                child: Image.asset(
+                child: Image.network(
                   imagePath,
                   width: double.infinity,
                   height: 120,
                   fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 120,
+                      width: double.infinity,
+                      alignment: Alignment.center,
+                      color: Colors.grey.shade200,
+                      child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                    );
+                  },
                 ),
               ),
 
-              // ⭐ RATING DENGAN BINTANG
+              // ⭐ RATING
               Positioned(
                 top: 8,
                 left: 8,
@@ -73,12 +82,13 @@ class MenuCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.star, color: Color.fromARGB(255, 179, 0, 0), size: 13),
+                      const Icon(Icons.star,
+                          color: Color.fromARGB(255, 179, 0, 0), size: 13),
                       const SizedBox(width: 2),
                       Text(
                         rating.toStringAsFixed(1),
                         style: GoogleFonts.poppins(
-                          color: const Color.fromARGB(255, 0, 0, 0),
+                          color: Colors.black,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -88,7 +98,7 @@ class MenuCard extends StatelessWidget {
                 ),
               ),
 
-              // ➕/➖ Tombol Qty
+              // QTY BUTTON
               Positioned(
                 bottom: 8,
                 right: 8,
@@ -133,7 +143,7 @@ class MenuCard extends StatelessWidget {
             ],
           ),
 
-          // 📋 BAGIAN TEKS
+          // 📋 TEXT
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Column(
@@ -172,8 +182,7 @@ class MenuCard extends StatelessWidget {
                   status,
                   style: GoogleFonts.poppins(
                     fontSize: 11,
-                    color:
-                        status == "Habis" ? Colors.red : Colors.green,
+                    color: status == "Habis" ? Colors.red : Colors.green,
                   ),
                 ),
               ],
