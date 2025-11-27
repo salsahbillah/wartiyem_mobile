@@ -3,12 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:wartiyem_mobile/widgets/topbar.dart';
-import 'package:wartiyem_mobile/widgets/menu_card.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
-import 'package:wartiyem_mobile/services/format.dart';
-
+import 'package:wartiyem_mobile/widgets/topbar.dart';
+import 'package:wartiyem_mobile/widgets/menu_card.dart';
 
 
 // ===================================================
@@ -66,34 +64,31 @@ class Food {
     );
   }
 
-  // Fix URL gambar — sesuai backend Cece (uploads → images)
   String resolvedImageUrl(String baseUrl) {
     if (image.toLowerCase().startsWith('http')) return image;
-
     final base = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-
-    if (image.contains('images/')) {
-      return '$base/$image';
-    }
-
     return '$base/images/$image';
   }
 
   void mergeRating(Map<String, dynamic> agg) {
     if (agg.containsKey('avgRating')) {
-      avgRating =
-          (agg['avgRating'] is num) ? (agg['avgRating'] as num).toDouble() : avgRating;
+      avgRating = (agg['avgRating'] is num)
+          ? (agg['avgRating'] as num).toDouble()
+          : avgRating;
     }
     if (agg.containsKey('totalReviews')) {
-      totalReviews = agg['totalReviews'] is int ? agg['totalReviews'] : totalReviews;
+      totalReviews = agg['totalReviews'] is int
+          ? agg['totalReviews']
+          : totalReviews;
     }
     if (agg.containsKey('ratingCounts') && agg['ratingCounts'] is Map) {
       ratingCounts = Map<String, int>.from(agg['ratingCounts']);
     }
   }
 }
+
 
 // ===================================================
 // API SERVICE
@@ -106,38 +101,36 @@ class ApiService {
   static const String reviewsTopEndpoint = '$base/api/reviews/top';
 
   static Future<List<Food>> fetchFoods() async {
-    final res =
-        await http.get(Uri.parse(foodsEndpoint)).timeout(const Duration(seconds: 20));
+    final res = await http.get(Uri.parse(foodsEndpoint));
 
     if (res.statusCode != 200) {
       throw Exception('Gagal ambil data menu (${res.statusCode})');
     }
 
     final body = json.decode(res.body);
-    final List list = body is List ? body : (body['data'] ?? body['foods'] ?? []);
+    final List list = body is List ? body : (body['data'] ?? []);
 
     return list.map((e) => Food.fromJson(Map<String, dynamic>.from(e))).toList();
   }
 
   static Future<List<Map<String, dynamic>>> fetchTopReviews() async {
-    final res = await http
-        .get(Uri.parse(reviewsTopEndpoint))
-        .timeout(const Duration(seconds: 20));
+    final res = await http.get(Uri.parse(reviewsTopEndpoint));
 
     if (res.statusCode != 200) {
       throw Exception('Gagal ambil rating (${res.statusCode})');
     }
 
     final body = json.decode(res.body);
-    final List list =
-        body is List ? body : (body['data'] ?? body['results'] ?? []);
+    final List list = body is List ? body : (body['data'] ?? []);
 
     return list.map((e) => Map<String, dynamic>.from(e)).toList();
   }
 }
 
+
+
 // ===================================================
-// MENU PAGE (UI SAMA, LOGIKA SAMA DGN WEB)
+// MENU PAGE (UPDATE: CART DENGAN DESCRIPTION + QTY)
 // ===================================================
 class MenuPage extends StatefulWidget {
   const MenuPage({super.key});
@@ -148,7 +141,6 @@ class MenuPage extends StatefulWidget {
 
 class _MenuPageState extends State<MenuPage> {
   List<Map<String, dynamic>> semuaMenu = [];
-
   bool isLoading = true;
   String? errorMessage;
 
@@ -170,9 +162,8 @@ class _MenuPageState extends State<MenuPage> {
 
       final Map<String, Map<String, dynamic>> agg = {};
       for (final r in top) {
-        final id =
-            (r['_id'] ?? r['foodId'] ?? r['id'])?.toString() ?? '';
-        if (id.isNotEmpty) agg[id] = r;
+        final id = (r['_id'] ?? r['foodId'] ?? '')?.toString();
+        if (id != null && id.isNotEmpty) agg[id] = r;
       }
 
       for (final f in foods) {
@@ -181,8 +172,7 @@ class _MenuPageState extends State<MenuPage> {
 
       final Map<String, List<Food>> grouped = {};
       for (final f in foods) {
-        final cat = f.category.isNotEmpty ? f.category : 'Umum';
-        grouped.putIfAbsent(cat, () => []).add(f);
+        grouped.putIfAbsent(f.category, () => []).add(f);
       }
 
       final List<Map<String, dynamic>> newData = [];
@@ -205,55 +195,52 @@ class _MenuPageState extends State<MenuPage> {
     }
   }
 
+
+  // ============= COUNT KERANJANG DI TOP BAR ===========
   int get totalCartItems {
-    int total = 0;
-    for (var kategori in semuaMenu) {
-      for (var item in kategori['items'] as List<Food>) {
-        total += item.qty;
-      }
-    }
-    return total;
+    final provider = Provider.of<CartProvider>(context, listen: false);
+    return provider.items.length;
   }
 
+
+  // ===================================================
+  // ADD KE CART (BARU) — include description & qty
+  // ===================================================
   void addToCart(Food f) {
-  Provider.of<CartProvider>(context, listen: false).addItem({
-    "id": f.id,
-    "name": f.name,
-    "price": f.price,
-    "qty": 1,
-    "image": f.resolvedImageUrl(ApiService.base),
-  });
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text("${f.name} ditambahkan ke keranjang")),
-  );
-}
-
-
-  void removeFromCart(Food m) {
-    setState(() {
-      if (m.qty > 0) m.qty--;
+    Provider.of<CartProvider>(context, listen: false).addItem({
+      "id": f.id,
+      "name": f.name,
+      "description": f.description,
+      "price": f.price,
+      "qty": 1,
+      "image": f.resolvedImageUrl(ApiService.base),
+      "total": f.price * 1,
     });
-  }
 
-  Widget _buildMenuCardFromFood(Food f) {
-    final img = f.image.isNotEmpty
-        ? f.resolvedImageUrl(ApiService.base)
-        : 'assets/images/tes.png';
-
-    return MenuCard(
-      nama: f.name,
-      deskripsi: f.description,
-      harga: FormatHelper.price(f.price),
-      status: f.status,
-      rating: f.avgRating,
-      qty: f.qty,
-      imagePath: img,
-      onAdd: () => addToCart(f),
-      onRemove: () => removeFromCart(f),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("${f.name} ditambahkan ke keranjang")),
     );
   }
 
+
+  Widget _buildMenuCard(Food f) {
+    return MenuCard(
+      nama: f.name,
+      deskripsi: f.description,
+      harga: f.price.toInt().toString(),
+      status: f.status,
+      rating: f.avgRating,
+      qty: f.qty,
+      imagePath: f.resolvedImageUrl(ApiService.base),
+      onAdd: () => addToCart(f),
+      onRemove: () {},
+    );
+  }
+
+
+  // ===================================================
+  // BUILD UI
+  // ===================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -295,21 +282,17 @@ class _MenuPageState extends State<MenuPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            children: [
-                              Text(
-                                kategori["kategori"],
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red.shade800,
-                                ),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Text(
+                              kategori["kategori"],
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red.shade800,
                               ),
-                            ],
+                            ),
                           ),
-                        ),
                           GridView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
@@ -323,7 +306,7 @@ class _MenuPageState extends State<MenuPage> {
                               mainAxisSpacing: 16,
                             ),
                             itemBuilder: (c, i) {
-                              return _buildMenuCardFromFood(items[i]);
+                              return _buildMenuCard(items[i]);
                             },
                           )
                         ],
