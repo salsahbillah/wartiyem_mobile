@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'providers/cart_provider.dart';
+
 import 'pages/landing_page.dart';
 import 'pages/login.dart';
 import 'pages/register_page.dart';
@@ -12,7 +16,14 @@ import 'pages/struk_page.dart';
 import 'widgets/navbar.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CartProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -29,13 +40,11 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        // 🟡 Landing Page
         '/': (context) => LandingPage(
               onLoginSuccess: () =>
                   Navigator.pushReplacementNamed(context, '/login'),
             ),
 
-        // 🟢 Login Page
         '/login': (context) => LoginPage(
               onLoginSuccess: () => Navigator.pushReplacement(
                 context,
@@ -43,16 +52,9 @@ class MyApp extends StatelessWidget {
               ),
             ),
 
-        // 🔵 Register Page
         '/regist': (context) => const RegisterPage(),
-
-        // 🛒 Keranjang
         '/cart': (context) => const CartPage(),
-
-        // 📦 Konfirmasi Pesanan
         '/order': (context) => const OrderPage(),
-
-        // 🧾 Struk Pesanan (WAJIB pakai order)
         '/struk': (context) => const StrukPage(order: {}),
       },
     );

@@ -1,11 +1,13 @@
 // menu_page.dart
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:wartiyem_mobile/widgets/topbar.dart';
 import 'package:wartiyem_mobile/widgets/menu_card.dart';
+import 'package:provider/provider.dart';
+import '../providers/cart_provider.dart';
+
 
 // ===================================================
 // MODEL: Food
@@ -211,9 +213,20 @@ class _MenuPageState extends State<MenuPage> {
     return total;
   }
 
-  void addToCart(Food m) {
-    setState(() => m.qty++);
-  }
+  void addToCart(Food f) {
+  Provider.of<CartProvider>(context, listen: false).addItem({
+    "id": f.id,
+    "name": f.name,
+    "price": f.price,
+    "qty": 1,
+    "image": f.resolvedImageUrl(ApiService.base),
+  });
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text("${f.name} ditambahkan ke keranjang")),
+  );
+}
+
 
   void removeFromCart(Food m) {
     setState(() {
