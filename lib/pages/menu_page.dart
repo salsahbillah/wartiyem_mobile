@@ -7,6 +7,8 @@ import 'package:wartiyem_mobile/widgets/topbar.dart';
 import 'package:wartiyem_mobile/widgets/menu_card.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import 'package:wartiyem_mobile/services/format.dart';
+
 
 
 // ===================================================
@@ -242,7 +244,7 @@ class _MenuPageState extends State<MenuPage> {
     return MenuCard(
       nama: f.name,
       deskripsi: f.description,
-      harga: f.price.toInt(),
+      harga: FormatHelper.price(f.price),
       status: f.status,
       rating: f.avgRating,
       qty: f.qty,
