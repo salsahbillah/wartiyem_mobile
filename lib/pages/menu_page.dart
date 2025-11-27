@@ -227,7 +227,7 @@ class _MenuPageState extends State<MenuPage> {
     return MenuCard(
       nama: f.name,
       deskripsi: f.description,
-      harga: f.price.toInt(),
+      harga: f.price.toInt().toString(),
       status: f.status,
       rating: f.avgRating,
       qty: f.qty,
