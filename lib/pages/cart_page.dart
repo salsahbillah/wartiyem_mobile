@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../services/format.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -32,8 +33,8 @@ class _CartPageState extends State<CartPage> {
     final cartProvider = Provider.of<CartProvider>(context);
     final cart = cartProvider.items;
 
-    final bool isCartEmpty = cart.isEmpty;
-    final bool canConfirm = !isCartEmpty && _selectedMethod != -1;
+    final isCartEmpty = cart.isEmpty;
+    final canConfirm = !isCartEmpty && _selectedMethod != -1;
 
     return Scaffold(
       appBar: AppBar(
@@ -47,9 +48,7 @@ class _CartPageState extends State<CartPage> {
       ),
 
       body: isCartEmpty
-          ? const Center(
-              child: Text("Keranjang masih kosong"),
-            )
+          ? const Center(child: Text("Keranjang masih kosong"))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -59,14 +58,13 @@ class _CartPageState extends State<CartPage> {
                     int index = entry.key;
                     var item = entry.value;
 
-                    // ensure numeric operations safe
                     final double priceDouble = (item['price'] is num)
                         ? (item['price'] as num).toDouble()
                         : double.tryParse('${item['price']}') ?? 0.0;
+
                     final int qty = (item['qty'] is int)
-                        ? item['qty'] as int
+                        ? item['qty']
                         : int.tryParse('${item['qty']}') ?? 0;
-                    double totalItem = priceDouble * qty;
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 18),
@@ -84,21 +82,23 @@ class _CartPageState extends State<CartPage> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // IMAGE (safeguard if null)
+                          // IMAGE
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: SizedBox(
                               width: 90,
                               height: 90,
-                              child: (item['image'] != null && item['image'].toString().isNotEmpty)
+                              child: (item['image'] != null &&
+                                      item['image'].toString().isNotEmpty)
                                   ? Image.network(
                                       item['image'],
-                                      width: 90,
-                                      height: 90,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Image.asset('assets/tes.png', fit: BoxFit.cover),
+                                      errorBuilder: (_, __, ___) =>
+                                          Image.asset('assets/tes.png',
+                                              fit: BoxFit.cover),
                                     )
-                                  : Image.asset('assets/tes.png', fit: BoxFit.cover),
+                                  : Image.asset('assets/tes.png',
+                                      fit: BoxFit.cover),
                             ),
                           ),
 
@@ -110,7 +110,7 @@ class _CartPageState extends State<CartPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  item['name'] ?? "-",
+                                  item['name'] ?? '-',
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -131,8 +131,9 @@ class _CartPageState extends State<CartPage> {
 
                                 const SizedBox(height: 4),
 
+                                // PRICE FORMATTED
                                 Text(
-                                  "Rp ${priceDouble.toInt()}",
+                                  "Rp ${FormatHelper.price(priceDouble)}",
                                   style: const TextStyle(
                                     color: Colors.red,
                                     fontWeight: FontWeight.bold,
@@ -147,12 +148,7 @@ class _CartPageState extends State<CartPage> {
                                     GestureDetector(
                                       onTap: () {
                                         final newQty = qty - 1;
-                                        if (newQty > 0) {
-                                          cartProvider.updateQty(index, newQty);
-                                        } else {
-                                          // jika jadi 0 => hapus item (kita pakai updateQty(index, 0) agar provider menangani)
-                                          cartProvider.updateQty(index, 0);
-                                        }
+                                        cartProvider.updateQty(index, newQty);
                                       },
                                       child: Container(
                                         padding: const EdgeInsets.all(4),
@@ -166,7 +162,8 @@ class _CartPageState extends State<CartPage> {
                                     ),
 
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10),
                                       child: Text(
                                         "$qty",
                                         style: const TextStyle(
@@ -196,93 +193,87 @@ class _CartPageState extends State<CartPage> {
                             ),
                           ),
 
-                          // TOTAL PRICE PER ITEM
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                "Total",
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey.shade600,
+                          // DELETE BUTTON
+                          IconButton(
+                            onPressed: () {
+                              showDialog<bool>(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('Hapus item'),
+                                  content: Text(
+                                      'Hapus "${item['name']}" dari keranjang?'),
+                                  actions: [
+                                    TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: const Text('Batal')),
+                                    TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: const Text('Ya')),
+                                  ],
                                 ),
-                              ),
-                              Text(
-                                "Rp ${totalItem.toInt()}",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-
-                              // Hapus: kita panggil updateQty(index,0) agar provider menghapus item
-                              IconButton(
-                                onPressed: () {
-                                  // konfirmasi hapus
-                                  showDialog<bool>(
-                                    context: context,
-                                    builder: (_) => AlertDialog(
-                                      title: const Text('Hapus item'),
-                                      content: Text('Apakah Anda yakin ingin menghapus "${item['name']}" dari keranjang?'),
-                                      actions: [
-                                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-                                        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ya')),
-                                      ],
-                                    ),
-                                  ).then((confirmed) {
-                                    if (confirmed == true) {
-                                      cartProvider.updateQty(index, 0);
-                                    }
-                                  });
-                                },
-                                icon: const Icon(Icons.delete_outline, color: Colors.black54),
-                              ),
-                            ],
-                          ),
+                              ).then((confirmed) {
+                                if (confirmed == true) {
+                                  cartProvider.updateQty(index, 0);
+                                }
+                              });
+                            },
+                            icon: const Icon(Icons.delete_outline,
+                                color: Colors.black54),
+                          )
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
 
                   const SizedBox(height: 16),
 
                   // ============= ORDER METHOD ============
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6)],
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 6)
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'Pilih Metode Pemesanan',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700),
                         ),
                         RadioListTile<int>(
                           value: 0,
                           groupValue: _selectedMethod,
                           activeColor: Colors.red,
                           title: const Text('Makan di Tempat'),
-                          onChanged: (v) => setState(() => _selectedMethod = v ?? -1),
+                          onChanged: (v) =>
+                              setState(() => _selectedMethod = v ?? -1),
                         ),
                         RadioListTile<int>(
                           value: 1,
                           groupValue: _selectedMethod,
                           activeColor: Colors.red,
                           title: const Text('Bungkus'),
-                          onChanged: (v) => setState(() => _selectedMethod = v ?? -1),
+                          onChanged: (v) =>
+                              setState(() => _selectedMethod = v ?? -1),
                         ),
                         RadioListTile<int>(
                           value: 2,
                           groupValue: _selectedMethod,
                           activeColor: Colors.red,
                           title: const Text('Diantar'),
-                          onChanged: (v) => setState(() => _selectedMethod = v ?? -1),
+                          onChanged: (v) =>
+                              setState(() => _selectedMethod = v ?? -1),
                         ),
                       ],
                     ),
@@ -290,17 +281,19 @@ class _CartPageState extends State<CartPage> {
 
                   const SizedBox(height: 16),
 
-                  // ============= SUBTOTAL =============
+                  // ============= SUBTOTAL ONLY ============
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
                         "Subtotal",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        "Rp ${cartProvider.subtotal.toInt()}",
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        "Rp ${FormatHelper.price(cartProvider.subtotal)}",
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -317,13 +310,14 @@ class _CartPageState extends State<CartPage> {
               padding: const EdgeInsets.all(16),
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: canConfirm ? Colors.red : Colors.grey.shade400,
+                  backgroundColor:
+                      canConfirm ? Colors.red : Colors.grey.shade400,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 onPressed: canConfirm
                     ? () {
-                        // kirim data ke halaman order — sesuaikan OrderPage agar menerima arguments
                         Navigator.pushNamed(
                           context,
                           '/order',
@@ -338,9 +332,10 @@ class _CartPageState extends State<CartPage> {
                 child: Text(
                   "Konfirmasi Pesanan",
                   style: TextStyle(
-                      color: canConfirm ? Colors.white : Colors.white70,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16),
+                    color: canConfirm ? Colors.white : Colors.white70,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ),
