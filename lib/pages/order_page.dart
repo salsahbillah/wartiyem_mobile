@@ -1,305 +1,365 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../../providers/cart_provider.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class OrderPage extends StatefulWidget {
-  const OrderPage({super.key});
+  final String orderMethod; // "makan_di_tempat", "bungkus", "diantar"
+  const OrderPage({super.key, required this.orderMethod});
 
   @override
   State<OrderPage> createState() => _OrderPageState();
 }
 
 class _OrderPageState extends State<OrderPage> {
-  final TextEditingController namaController = TextEditingController();
-  final TextEditingController catatanController = TextEditingController();
-  String? selectedVoucher;
-  bool isVoucherApplied = false;
-  String metodePembayaran = "";
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController tableController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController addressController = TextEditingController();
+  final TextEditingController noteController = TextEditingController();
+
+  bool isLoading = false;
+
+  // ======== Voucher UI States ========
+  bool showVoucherDropdown = false;
+  bool showAllVouchers = false;
+  List voucherList = [];
+  Map<String, dynamic>? voucherApplied;
+  double discountAmount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchVouchers();
+  }
+
+  Future<void> fetchVouchers() async {
+    try {
+      final res = await http.get(
+        Uri.parse('https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/voucher'),
+      );
+      final data = json.decode(res.body);
+      setState(() {
+        voucherList = data['vouchers'];
+      });
+    } catch (e) {
+      debugPrint('Voucher error: $e');
+    }
+  }
+
+  void applyVoucher(Map<String, dynamic> v, double subtotal) {
+    double disc = 0;
+    if (v['type'] == 'percentage') {
+      disc = subtotal * (v['value'] / 100);
+    } else {
+      disc = v['value'].toDouble();
+    }
+
+    setState(() {
+      voucherApplied = v;
+      discountAmount = disc;
+      showVoucherDropdown = false;
+    });
+  }
+
+  Future<void> submitOrder(double subtotal, List items) async {
+    if (nameController.text.isEmpty) {
+      showMsg("Nama harus diisi");
+      return;
+    }
+
+    if (widget.orderMethod == "makan_di_tempat" &&
+        tableController.text.isEmpty) {
+      showMsg("Nomor meja harus diisi");
+      return;
+    }
+
+    if (widget.orderMethod == "diantar") {
+      if (phoneController.text.isEmpty || addressController.text.isEmpty) {
+        showMsg("No telepon & alamat wajib diisi");
+        return;
+      }
+    }
+
+    setState(() => isLoading = true);
+
+    // Fee
+    double serviceFee = subtotal * 0.10;
+    double deliveryFee =
+        widget.orderMethod == "diantar" ? 8000 : 0;
+
+    double total = subtotal + serviceFee + deliveryFee - discountAmount;
+
+    Map<String, dynamic> payload = {
+      "name": nameController.text.trim(),
+      "method": widget.orderMethod,
+      "items": items,
+      "subtotal": subtotal,
+      "service_fee": serviceFee,
+      "delivery_fee": deliveryFee,
+      "discount": discountAmount,
+      "totalAmount": total,
+      "payment": "cash",
+      "note": noteController.text.trim(),
+      "voucherId": voucherApplied?["_id"] ?? "",
+      "tableNumber": widget.orderMethod == "makan_di_tempat"
+          ? tableController.text.trim()
+          : "",
+      "phone": widget.orderMethod == "diantar"
+          ? phoneController.text.trim()
+          : "",
+      "address": widget.orderMethod == "diantar"
+          ? addressController.text.trim()
+          : "",
+    };
+
+    try {
+      final res = await http.post(
+        Uri.parse('https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/order/place'),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(payload),
+      );
+
+      final data = json.decode(res.body);
+
+      if (data["success"] == true) {
+        if (mounted) {
+          Provider.of<CartProvider>(context, listen: false).clearCart();
+        }
+        showMsg("Pesanan berhasil dibuat!");
+      } else {
+        showMsg("Gagal membuat pesanan");
+      }
+    } catch (e) {
+      showMsg("Terjadi kesalahan");
+    }
+
+    setState(() => isLoading = false);
+  }
+
+  void showMsg(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final cart = Provider.of<CartProvider>(context);
+    double subtotal = cart.subtotal;
+
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.red),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-        title: Text(
-          "Pesanan",
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        centerTitle: false,
-      ),
+      appBar: AppBar(title: const Text("Buat Pesanan")),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Informasi Pemesanan (Bungkus)",
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 10),
+            title("Nama Pemesan"),
+            inputField(nameController, "Masukkan nama"),
 
-            // Input nama
-            TextField(
-              controller: namaController,
-              decoration: InputDecoration(
-                hintText: "Nama",
-                hintStyle: GoogleFonts.poppins(color: Colors.grey),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Colors.red),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Colors.red, width: 2),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
+            if (widget.orderMethod == "makan_di_tempat") ...[
+              title("Nomor Meja"),
+              inputField(tableController, "Meja berapa?"),
+            ],
 
-            // Catatan
-            TextField(
-              controller: catatanController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: "Catatan Untuk Pesanan (Opsional)",
-                hintStyle: GoogleFonts.poppins(color: Colors.grey),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Colors.red),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Colors.red, width: 2),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-              ),
-            ),
+            if (widget.orderMethod == "diantar") ...[
+              title("No Telepon"),
+              inputField(phoneController, "08xxxx"),
+              title("Alamat Lengkap"),
+              inputField(addressController, "Masukkan alamat"),
+            ],
+
+            title("Catatan"),
+            inputField(noteController, "Catatan tambahan (opsional)"),
+
             const SizedBox(height: 20),
+            buildVoucherDropdown(subtotal),
 
-            // Voucher
-            Text(
-              "Voucher Tersedia",
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
+            const SizedBox(height: 20),
+            buildSummary(subtotal),
+
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isLoading
+                    ? null
+                    : () => submitOrder(subtotal, cart.items),
+                child: isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text("Buat Pesanan"),
               ),
             ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(5),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget title(String s) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, top: 12),
+      child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget inputField(TextEditingController c, String hint) {
+    return TextField(
+      controller: c,
+      decoration: InputDecoration(
+        hintText: hint,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  // ========================
+  //   VOUCHER UI
+  // ========================
+  Widget buildVoucherDropdown(double subtotal) {
+    List displayed = showAllVouchers
+        ? voucherList
+        : voucherList.take(4).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        title("Voucher"),
+
+        GestureDetector(
+          onTap: () {
+            setState(() => showVoucherDropdown = !showVoucherDropdown);
+          },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade400),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  voucherApplied != null
+                      ? voucherApplied!["name"]
+                      : "Pilih Voucher",
                 ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              ),
-              hint: Text(
-                "Diskon 4% (Min Rp 20.000)",
-                style: GoogleFonts.poppins(fontSize: 14),
-              ),
-              value: selectedVoucher,
-              onChanged: (value) {
-                setState(() {
-                  selectedVoucher = value;
-                });
-              },
-              items: const [
-                DropdownMenuItem(
-                  value: "diskon4",
-                  child: Text("Diskon 4% (Min Rp 20.000)"),
-                ),
+                const Spacer(),
+                Icon(showVoucherDropdown
+                    ? Icons.keyboard_arrow_up
+                    : Icons.keyboard_arrow_down),
               ],
             ),
-            const SizedBox(height: 10),
+          ),
+        ),
 
-            // Card Voucher
-            if (selectedVoucher != null)
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.red),
-                  borderRadius: BorderRadius.circular(5),
+        if (voucherApplied != null)
+          Container(
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.green.shade300),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "${voucherApplied!['name']} - terpasang",
+                    style: TextStyle(color: Colors.green.shade800),
+                  ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.red),
+                  onPressed: () {
+                    setState(() {
+                      voucherApplied = null;
+                      discountAmount = 0;
+                    });
+                  },
+                )
+              ],
+            ),
+          ),
+
+        if (showVoucherDropdown)
+          Column(
+            children: [
+              const SizedBox(height: 10),
+              for (var v in displayed)
+                GestureDetector(
+                  onTap: () => applyVoucher(v, subtotal),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
                       children: [
-                        Text(
-                          "Diskon 4%",
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
-                          ),
-                        ),
-                        Text(
-                          "Min. Order Rp 20.000",
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.grey[700],
-                          ),
+                        Expanded(
+                          child: Text("${v['name']} - ${v['description']}"),
                         ),
                       ],
                     ),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          isVoucherApplied = true;
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                      ),
-                      child: Text(
-                        "Pakai",
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    )
-                  ],
+                  ),
                 ),
-              ),
-            const SizedBox(height: 20),
+              if (voucherList.length > 4)
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      showAllVouchers = !showAllVouchers;
+                    });
+                  },
+                  child:
+                      Text(showAllVouchers ? "Lihat lebih sedikit" : "Lihat lainnya"),
+                )
+            ],
+          ),
+      ],
+    );
+  }
 
-            // Ringkasan Pesanan
-            Text(
-              "Ringkasan Pesanan",
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 10),
+  // ========================
+  //   SUMMARY
+  // ========================
+  Widget buildSummary(double subtotal) {
+    double serviceFee = subtotal * 0.10;
+    double deliveryFee =
+        widget.orderMethod == "diantar" ? 8000 : 0;
+    double total = subtotal + serviceFee + deliveryFee - discountAmount;
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("NASI LIWET AYAM GORENG",
-                    style: GoogleFonts.poppins(fontSize: 14)),
-                Text("Rp 20.000", style: GoogleFonts.poppins(fontSize: 14)),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Biaya Layanan 10%",
-                    style: GoogleFonts.poppins(fontSize: 14)),
-                Text("Rp 2.000", style: GoogleFonts.poppins(fontSize: 14)),
-              ],
-            ),
-            const Divider(height: 20, thickness: 1),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "TOTAL",
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-                Text(
-                  "Rp 22.000",
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        title("Ringkasan Pembayaran"),
+        summaryRow("Subtotal", "Rp ${subtotal.toStringAsFixed(0)}"),
+        summaryRow("Service Fee (10%)", "Rp ${serviceFee.toStringAsFixed(0)}"),
+        if (deliveryFee > 0)
+          summaryRow("Delivery Fee", "Rp ${deliveryFee.toStringAsFixed(0)}"),
+        if (discountAmount > 0)
+          summaryRow("Diskon", "- Rp ${discountAmount.toStringAsFixed(0)}"),
+        const Divider(),
+        summaryRow("Total", "Rp ${total.toStringAsFixed(0)}",
+            isBold: true),
+      ],
+    );
+  }
 
-            // Metode Pembayaran
-            Text(
-              "Pilih Metode Pembayaran",
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w500,
-                fontSize: 15,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: RadioListTile<String>(
-                    title: Text("Tunai",
-                        style: GoogleFonts.poppins(fontSize: 14)),
-                    value: "tunai",
-                    groupValue: metodePembayaran,
-                    activeColor: Colors.red,
-                    onChanged: (value) {
-                      setState(() {
-                        metodePembayaran = value!;
-                      });
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: RadioListTile<String>(
-                    title: Text("Non Tunai",
-                        style: GoogleFonts.poppins(fontSize: 14)),
-                    value: "non_tunai",
-                    groupValue: metodePembayaran,
-                    activeColor: Colors.red,
-                    onChanged: (value) {
-                      setState(() {
-                        metodePembayaran = value!;
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Tombol Pesan
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Navigasi ke halaman Struk
-                  Navigator.pushNamed(context, '/struk');
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: Text(
-                  "Pesan",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 40),
-          ],
-        ),
+  Widget summaryRow(String left, String right, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text(left,
+              style:
+                  TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          const Spacer(),
+          Text(right,
+              style:
+                  TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+        ],
       ),
     );
   }

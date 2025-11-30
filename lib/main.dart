@@ -54,7 +54,11 @@ class MyApp extends StatelessWidget {
 
         '/regist': (context) => const RegisterPage(),
         '/cart': (context) => const CartPage(),
-        '/order': (context) => const OrderPage(),
+
+        // ✅ ORDER PAGE HARUS PUNYA PARAMETER orderMethod
+        '/order': (context) => const OrderPage(orderMethod: "makan_di_tempat"),
+
+        // ✅ STRUK PAGE HARUS ADA PARAMETER order YANG VALID
         '/struk': (context) => const StrukPage(order: {}),
       },
     );
