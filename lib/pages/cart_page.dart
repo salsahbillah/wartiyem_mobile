@@ -1,4 +1,5 @@
-// cart_page.dart
+// lib/pages/cart_page.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
@@ -15,6 +16,9 @@ class _CartPageState extends State<CartPage> {
   // -1 = belum pilih, 0 = Makan di Tempat, 1 = Bungkus, 2 = Diantar
   int _selectedMethod = -1;
 
+  // BASE URL backend kamu
+  final String baseUrl = "https://wartiyem.nabaspace.my.id/";
+
   String _methodValueLabel(int v) {
     switch (v) {
       case 0:
@@ -26,6 +30,19 @@ class _CartPageState extends State<CartPage> {
       default:
         return "";
     }
+  }
+
+  // Build full image URL
+  String buildImageUrl(String? image) {
+    if (image == null || image.isEmpty) return "";
+
+    // Jika full URL
+    if (image.startsWith("http://") || image.startsWith("https://")) {
+      return image;
+    }
+
+    // Jika relative path
+    return baseUrl + image;
   }
 
   @override
@@ -53,7 +70,7 @@ class _CartPageState extends State<CartPage> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // ============= ITEM LIST ============
+                  // =================== ITEM LIST ===================
                   ...cart.asMap().entries.map((entry) {
                     int index = entry.key;
                     var item = entry.value;
@@ -65,6 +82,9 @@ class _CartPageState extends State<CartPage> {
                     final int qty = (item['qty'] is int)
                         ? item['qty']
                         : int.tryParse('${item['qty']}') ?? 0;
+
+                    final String imgRaw = item['image']?.toString() ?? "";
+                    final String imageUrl = buildImageUrl(imgRaw);
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 18),
@@ -82,23 +102,22 @@ class _CartPageState extends State<CartPage> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // IMAGE
+                          // IMAGE FIXED
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: SizedBox(
                               width: 90,
                               height: 90,
-                              child: (item['image'] != null &&
-                                      item['image'].toString().isNotEmpty)
+                              child: imageUrl.isNotEmpty
                                   ? Image.network(
-                                      item['image'],
+                                      imageUrl,
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) =>
-                                          Image.asset('assets/tes.png',
-                                              fit: BoxFit.cover),
+                                          const Icon(Icons.image_not_supported,
+                                              size: 48, color: Colors.grey),
                                     )
-                                  : Image.asset('assets/tes.png',
-                                      fit: BoxFit.cover),
+                                  : const Icon(Icons.image_not_supported,
+                                      size: 48, color: Colors.grey),
                             ),
                           ),
 
@@ -131,7 +150,6 @@ class _CartPageState extends State<CartPage> {
 
                                 const SizedBox(height: 4),
 
-                                // PRICE FORMATTED
                                 Text(
                                   "Rp ${FormatHelper.price(priceDouble)}",
                                   style: const TextStyle(
@@ -142,7 +160,7 @@ class _CartPageState extends State<CartPage> {
 
                                 const SizedBox(height: 8),
 
-                                // QTY CONTROLS
+                                // QTY Controls
                                 Row(
                                   children: [
                                     GestureDetector(
@@ -162,8 +180,8 @@ class _CartPageState extends State<CartPage> {
                                     ),
 
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10),
+                                      padding:
+                                          const EdgeInsets.symmetric(horizontal: 10),
                                       child: Text(
                                         "$qty",
                                         style: const TextStyle(
@@ -193,7 +211,7 @@ class _CartPageState extends State<CartPage> {
                             ),
                           ),
 
-                          // DELETE BUTTON
+                          // Delete Button
                           IconButton(
                             onPressed: () {
                               showDialog<bool>(
@@ -229,7 +247,7 @@ class _CartPageState extends State<CartPage> {
 
                   const SizedBox(height: 16),
 
-                  // ============= ORDER METHOD ============
+                  // =================== METODE PEMESANAN ===================
                   Container(
                     width: double.infinity,
                     padding:
@@ -251,6 +269,7 @@ class _CartPageState extends State<CartPage> {
                           style: TextStyle(
                               fontSize: 14, fontWeight: FontWeight.w700),
                         ),
+
                         RadioListTile<int>(
                           value: 0,
                           groupValue: _selectedMethod,
@@ -259,6 +278,7 @@ class _CartPageState extends State<CartPage> {
                           onChanged: (v) =>
                               setState(() => _selectedMethod = v ?? -1),
                         ),
+
                         RadioListTile<int>(
                           value: 1,
                           groupValue: _selectedMethod,
@@ -267,6 +287,7 @@ class _CartPageState extends State<CartPage> {
                           onChanged: (v) =>
                               setState(() => _selectedMethod = v ?? -1),
                         ),
+
                         RadioListTile<int>(
                           value: 2,
                           groupValue: _selectedMethod,
@@ -281,7 +302,7 @@ class _CartPageState extends State<CartPage> {
 
                   const SizedBox(height: 16),
 
-                  // ============= SUBTOTAL ONLY ============
+                  // =================== SUBTOTAL ===================
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -303,7 +324,7 @@ class _CartPageState extends State<CartPage> {
               ),
             ),
 
-      // ============= BUTTON CONFIRM ============
+      // =================== BUTTON CONFIRM ===================
       bottomNavigationBar: isCartEmpty
           ? null
           : Padding(
