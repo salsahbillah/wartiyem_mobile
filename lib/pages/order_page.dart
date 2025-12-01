@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import '../../providers/cart_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'struk_page.dart';
 
 class OrderPage extends StatefulWidget {
-  final String orderMethod; // "makan_di_tempat", "bungkus", "diantar"
+  final String orderMethod;
+
   const OrderPage({super.key, required this.orderMethod});
 
   @override
@@ -14,19 +16,21 @@ class OrderPage extends StatefulWidget {
 
 class _OrderPageState extends State<OrderPage> {
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController tableController = TextEditingController();
+  final TextEditingController noteController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
-  final TextEditingController noteController = TextEditingController();
+  final TextEditingController tableController = TextEditingController();
 
   bool isLoading = false;
 
-  // ======== Voucher UI States ========
-  bool showVoucherDropdown = false;
-  bool showAllVouchers = false;
+  // Voucher
   List voucherList = [];
   Map<String, dynamic>? voucherApplied;
+  bool voucherDropdown = false;
   double discountAmount = 0;
+
+  // Payment
+  String paymentMethod = "tunai";
 
   @override
   void initState() {
@@ -34,35 +38,72 @@ class _OrderPageState extends State<OrderPage> {
     fetchVouchers();
   }
 
+  // ============================================================
+  //                    API GET VOUCHER
+  // ============================================================
   Future<void> fetchVouchers() async {
     try {
       final res = await http.get(
-        Uri.parse('https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/voucher'),
+        Uri.parse(
+          'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/vouchers',
+        ),
       );
+
       final data = json.decode(res.body);
-      setState(() {
-        voucherList = data['vouchers'];
-      });
+
+      if (data is List) {
+        setState(() => voucherList = data);
+      } else if (data is Map && data["vouchers"] is List) {
+        setState(() => voucherList = data["vouchers"]);
+      } else if (data is Map && data["data"] is List) {
+        setState(() => voucherList = data["data"]);
+      } else {
+        debugPrint("Voucher API unexpected: $data");
+      }
     } catch (e) {
-      debugPrint('Voucher error: $e');
+      debugPrint("Voucher API Exception: $e");
     }
   }
 
-  void applyVoucher(Map<String, dynamic> v, double subtotal) {
-    double disc = 0;
-    if (v['type'] == 'percentage') {
-      disc = subtotal * (v['value'] / 100);
-    } else {
-      disc = v['value'].toDouble();
-    }
+  // ============================================================
+  //           APPLY VOUCHER (CALL BACKEND API)
+  // ============================================================
+  Future<void> applyVoucher(Map<String, dynamic> v, double subtotal) async {
+    try {
+      final res = await http.post(
+        Uri.parse(
+            "https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/vouchers/apply"),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({
+          "voucherId": v["_id"],
+          "subtotal": subtotal,
+        }),
+      );
 
-    setState(() {
-      voucherApplied = v;
-      discountAmount = disc;
-      showVoucherDropdown = false;
-    });
+      final data = json.decode(res.body);
+      debugPrint("VOUCHER APPLY RESPONSE MOBILE: $data");
+
+      if (data["success"] != true) {
+        showMsg(data["message"] ?? "Voucher tidak valid");
+        return;
+      }
+
+      setState(() {
+        voucherApplied = data["voucher"];
+        discountAmount = (data["discount"] ?? 0).toDouble();
+        voucherDropdown = false;
+      });
+
+      showMsg("Voucher ${voucherApplied!['name']} berhasil diterapkan");
+    } catch (e) {
+      debugPrint("Apply Voucher Error: $e");
+      showMsg("Voucher gagal diterapkan");
+    }
   }
 
+  // ============================================================
+  //                     SUBMIT ORDER
+  // ============================================================
   Future<void> submitOrder(double subtotal, List items) async {
     if (nameController.text.isEmpty) {
       showMsg("Nama harus diisi");
@@ -77,18 +118,15 @@ class _OrderPageState extends State<OrderPage> {
 
     if (widget.orderMethod == "diantar") {
       if (phoneController.text.isEmpty || addressController.text.isEmpty) {
-        showMsg("No telepon & alamat wajib diisi");
+        showMsg("Nomor telepon dan alamat wajib diisi");
         return;
       }
     }
 
     setState(() => isLoading = true);
 
-    // Fee
     double serviceFee = subtotal * 0.10;
-    double deliveryFee =
-        widget.orderMethod == "diantar" ? 8000 : 0;
-
+    double deliveryFee = widget.orderMethod == "diantar" ? 3000 : 0;
     double total = subtotal + serviceFee + deliveryFee - discountAmount;
 
     Map<String, dynamic> payload = {
@@ -100,265 +138,354 @@ class _OrderPageState extends State<OrderPage> {
       "delivery_fee": deliveryFee,
       "discount": discountAmount,
       "totalAmount": total,
-      "payment": "cash",
+      "payment": paymentMethod,
       "note": noteController.text.trim(),
       "voucherId": voucherApplied?["_id"] ?? "",
-      "tableNumber": widget.orderMethod == "makan_di_tempat"
-          ? tableController.text.trim()
-          : "",
-      "phone": widget.orderMethod == "diantar"
-          ? phoneController.text.trim()
-          : "",
-      "address": widget.orderMethod == "diantar"
-          ? addressController.text.trim()
-          : "",
+      "phone": phoneController.text.trim(),
+      "address": addressController.text.trim(),
+      "tableNumber": tableController.text.trim(),
     };
 
     try {
       final res = await http.post(
-        Uri.parse('https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/order/place'),
+        Uri.parse(
+            "https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/order/place"),
         headers: {"Content-Type": "application/json"},
         body: json.encode(payload),
       );
 
       final data = json.decode(res.body);
 
+      if (!mounted) return;
+
       if (data["success"] == true) {
-        if (mounted) {
-          Provider.of<CartProvider>(context, listen: false).clearCart();
-        }
-        showMsg("Pesanan berhasil dibuat!");
+        Provider.of<CartProvider>(context, listen: false).clearCart();
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StrukPage(order: data["order"]),
+          ),
+        );
       } else {
-        showMsg("Gagal membuat pesanan");
+        showMsg(data["message"] ?? "Gagal membuat pesanan");
       }
     } catch (e) {
       showMsg("Terjadi kesalahan");
     }
 
-    setState(() => isLoading = false);
+    if (mounted) {
+      setState(() => isLoading = false);
+    }
   }
 
   void showMsg(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  // ============================================================
+  //                           UI
+  // ============================================================
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
     double subtotal = cart.subtotal;
 
+    String methodLabel = widget.orderMethod == "makan_di_tempat"
+        ? "Informasi Pemesanan (Makan di Tempat)"
+        : widget.orderMethod == "bungkus"
+            ? "Informasi Pemesanan (Bungkus)"
+            : "Informasi Pemesanan (Diantar)";
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Buat Pesanan")),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Padding(
+            padding: EdgeInsets.only(left: 8),
+            child: Icon(Icons.arrow_back, color: Colors.red, size: 28),
+          ),
+        ),
+        title: const Text(
+          "Pesan",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+        ),
+      ),
+
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            title("Nama Pemesan"),
-            inputField(nameController, "Masukkan nama"),
+            const SizedBox(height: 10),
+
+            Text(
+              methodLabel,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            buildInput(nameController, "Nama"),
 
             if (widget.orderMethod == "makan_di_tempat") ...[
-              title("Nomor Meja"),
-              inputField(tableController, "Meja berapa?"),
+              const SizedBox(height: 12),
+              buildInput(tableController, "Nomor Meja"),
             ],
 
             if (widget.orderMethod == "diantar") ...[
-              title("No Telepon"),
-              inputField(phoneController, "08xxxx"),
-              title("Alamat Lengkap"),
-              inputField(addressController, "Masukkan alamat"),
+              const SizedBox(height: 12),
+              buildInput(phoneController, "Nomor Telepon"),
+              const SizedBox(height: 12),
+              buildInput(addressController, "Alamat Lengkap"),
             ],
 
-            title("Catatan"),
-            inputField(noteController, "Catatan tambahan (opsional)"),
+            const SizedBox(height: 12),
 
-            const SizedBox(height: 20),
+            buildTextArea(noteController, "Catatan Untuk Pesanan (Opsional)"),
+
+            const SizedBox(height: 25),
+
+            // ================== VOUCHER ===================
+            const Text("Voucher Tersedia",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+
+            const SizedBox(height: 8),
+
             buildVoucherDropdown(subtotal),
 
-            const SizedBox(height: 20),
-            buildSummary(subtotal),
+            if (voucherDropdown) buildVoucherList(subtotal),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 25),
+
+            // ================== RINGKASAN ===================
+            const Text("Ringkasan Pesanan",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+
+            const SizedBox(height: 12),
+
+            ...cart.items.map((item) {
+              int qty = item['qty'] ?? 1;
+              return summaryRow(
+                  "${item['name']} x$qty", "Rp ${item['price'] * qty}");
+            }),
+
+            summaryRow(
+              "Biaya Layanan 10%",
+              "Rp ${(subtotal * 0.10).toStringAsFixed(0)}",
+            ),
+
+            if (widget.orderMethod == "diantar")
+              summaryRow("Ongkir", "Rp 3000"),
+
+            if (voucherApplied != null)
+              summaryRow(
+                "Diskon (${voucherApplied!['name']})",
+                "- Rp ${discountAmount.toStringAsFixed(0)}",
+              ),
+
+            const Divider(),
+            summaryRow(
+              "TOTAL",
+              "Rp ${(subtotal + (subtotal * 0.10) + (widget.orderMethod == "diantar" ? 3000 : 0) - discountAmount).toStringAsFixed(0)}",
+              bold: true,
+            ),
+
+            const SizedBox(height: 25),
+
+            // ================== PEMBAYARAN ===================
+            const Text("Pilih Metode Pembayaran",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+
+            Row(
+              children: [
+                Radio(
+                  value: "tunai",
+                  groupValue: paymentMethod,
+                  activeColor: Colors.red,
+                  onChanged: (v) =>
+                      setState(() => paymentMethod = v.toString()),
+                ),
+                const Text("Tunai"),
+                const SizedBox(width: 20),
+                Radio(
+                  value: "non_tunai",
+                  groupValue: paymentMethod,
+                  activeColor: Colors.red,
+                  onChanged: (v) =>
+                      setState(() => paymentMethod = v.toString()),
+                ),
+                const Text("Non Tunai"),
+              ],
+            ),
+
+            const SizedBox(height: 25),
+
+            // ================== BUTTON ===================
             SizedBox(
               width: double.infinity,
+              height: 48,
               child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 onPressed: isLoading
                     ? null
                     : () => submitOrder(subtotal, cart.items),
                 child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Buat Pesanan"),
+                    ? const CircularProgressIndicator(
+                        color: Colors.white,
+                      )
+                    : const Text(
+                        "Pesan",
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
+
+            const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
 
-  Widget title(String s) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6, top: 12),
-      child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Widget inputField(TextEditingController c, String hint) {
+  // ============================================================
+  // WIDGET BUILDER
+  // ============================================================
+  Widget buildInput(TextEditingController c, String hint) {
     return TextField(
       controller: c,
       decoration: InputDecoration(
         hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        border: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(6),
+        ),
       ),
     );
   }
 
-  // ========================
-  //   VOUCHER UI
-  // ========================
-  Widget buildVoucherDropdown(double subtotal) {
-    List displayed = showAllVouchers
-        ? voucherList
-        : voucherList.take(4).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        title("Voucher"),
-
-        GestureDetector(
-          onTap: () {
-            setState(() => showVoucherDropdown = !showVoucherDropdown);
-          },
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade400),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  voucherApplied != null
-                      ? voucherApplied!["name"]
-                      : "Pilih Voucher",
-                ),
-                const Spacer(),
-                Icon(showVoucherDropdown
-                    ? Icons.keyboard_arrow_up
-                    : Icons.keyboard_arrow_down),
-              ],
-            ),
-          ),
+  Widget buildTextArea(TextEditingController c, String hint) {
+    return TextField(
+      controller: c,
+      maxLines: 3,
+      decoration: InputDecoration(
+        hintText: hint,
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        border: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(6),
         ),
+      ),
+    );
+  }
 
-        if (voucherApplied != null)
+  Widget buildVoucherDropdown(double subtotal) {
+    return GestureDetector(
+      onTap: () => setState(() => voucherDropdown = !voucherDropdown),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            Text(
+              voucherApplied != null
+                  ? voucherApplied!["name"]
+                  : "Pilih Voucher",
+            ),
+            const Spacer(),
+            Icon(voucherDropdown
+                ? Icons.keyboard_arrow_up
+                : Icons.keyboard_arrow_down),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildVoucherList(double subtotal) {
+    return Column(
+      children: [
+        const SizedBox(height: 10),
+        for (var v in voucherList)
           Container(
-            margin: const EdgeInsets.only(top: 10),
+            margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.green.shade300),
+              border: Border.all(color: Colors.red.shade300),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    "${voucherApplied!['name']} - terpasang",
-                    style: TextStyle(color: Colors.green.shade800),
+                    "${v['name']}\nMin. Order Rp ${v['minOrder']}",
+                    style: const TextStyle(fontSize: 13),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.red),
-                  onPressed: () {
-                    setState(() {
-                      voucherApplied = null;
-                      discountAmount = 0;
-                    });
-                  },
+                ElevatedButton(
+                  onPressed: () => applyVoucher(v, subtotal),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        voucherApplied != null &&
+                                voucherApplied!["_id"] == v["_id"]
+                            ? Colors.red
+                            : Colors.grey,
+                    minimumSize: const Size(70, 35),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6)),
+                  ),
+                  child: Text(
+                    voucherApplied != null &&
+                            voucherApplied!["_id"] == v["_id"]
+                        ? "Dipakai"
+                        : "Pakai",
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 )
               ],
             ),
           ),
-
-        if (showVoucherDropdown)
-          Column(
-            children: [
-              const SizedBox(height: 10),
-              for (var v in displayed)
-                GestureDetector(
-                  onTap: () => applyVoucher(v, subtotal),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text("${v['name']} - ${v['description']}"),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              if (voucherList.length > 4)
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      showAllVouchers = !showAllVouchers;
-                    });
-                  },
-                  child:
-                      Text(showAllVouchers ? "Lihat lebih sedikit" : "Lihat lainnya"),
-                )
-            ],
-          ),
       ],
     );
   }
 
-  // ========================
-  //   SUMMARY
-  // ========================
-  Widget buildSummary(double subtotal) {
-    double serviceFee = subtotal * 0.10;
-    double deliveryFee =
-        widget.orderMethod == "diantar" ? 8000 : 0;
-    double total = subtotal + serviceFee + deliveryFee - discountAmount;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        title("Ringkasan Pembayaran"),
-        summaryRow("Subtotal", "Rp ${subtotal.toStringAsFixed(0)}"),
-        summaryRow("Service Fee (10%)", "Rp ${serviceFee.toStringAsFixed(0)}"),
-        if (deliveryFee > 0)
-          summaryRow("Delivery Fee", "Rp ${deliveryFee.toStringAsFixed(0)}"),
-        if (discountAmount > 0)
-          summaryRow("Diskon", "- Rp ${discountAmount.toStringAsFixed(0)}"),
-        const Divider(),
-        summaryRow("Total", "Rp ${total.toStringAsFixed(0)}",
-            isBold: true),
-      ],
-    );
-  }
-
-  Widget summaryRow(String left, String right, {bool isBold = false}) {
+  Widget summaryRow(String left, String right, {bool bold = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          Text(left,
-              style:
-                  TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          Text(
+            left,
+            style: TextStyle(
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
           const Spacer(),
-          Text(right,
-              style:
-                  TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          Text(
+            right,
+            style: TextStyle(
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
         ],
       ),
     );
