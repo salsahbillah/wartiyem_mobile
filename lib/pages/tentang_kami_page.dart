@@ -294,7 +294,7 @@ class TentangKamiPage extends StatelessWidget {
                     runSpacing: 30,
                     children: [
                       _TeamCard(
-                        image: 'assets/images/om.jpeg',
+                        image: 'assets/images/eka.jpg',
                         name: 'Eka Dava Fadilah Juliansah',
                       ),
                       _TeamCard(
