@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';   // WAJIB
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -19,7 +20,6 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> loginUser() async {
     setState(() => isLoading = true);
 
-    // 🔗 URL dari ngrok kamu (ganti endpoint sesuai backend)
     const String apiUrl =
         'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/user/login';
 
@@ -36,6 +36,12 @@ class _LoginPageState extends State<LoginPage> {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
+
+        // ⬇⬇⬇ SIMPAN TOKEN DI SINI
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString("token", data["token"]);
+        // ⬆⬆⬆ WAJIB
+
         widget.onLoginSuccess();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
