@@ -6,15 +6,18 @@ class CartProvider with ChangeNotifier {
   List<Map<String, dynamic>> get items => _items;
 
   void addItem(Map<String, dynamic> item) {
-    // Jika item sudah ada → tambah qty
-    int index = _items.indexWhere((e) => e['id'] == item['id']);
-    if (index != -1) {
-      _items[index]['qty'] += 1;
-    } else {
-      _items.add(item);
-    }
-    notifyListeners();
+  int index = _items.indexWhere((e) =>
+    (e['_id'] != null && item['_id'] != null && e['_id'] == item['_id']) ||
+    (e['id'] != null && item['id'] != null && e['id'] == item['id'])
+  );
+  if (index != -1) {
+    _items[index]['qty'] = (_items[index]['qty'] ?? 0) + (item['qty'] ?? 1);
+  } else {
+    _items.add(item);
   }
+  notifyListeners();
+}
+
 
   void updateQty(int index, int newQty) {
     if (newQty <= 0) {
@@ -33,7 +36,7 @@ class CartProvider with ChangeNotifier {
   double get subtotal {
     double total = 0;
     for (var item in _items) {
-      total += item['price'] * item['qty'];
+      total += (item['price'] as num) * (item['qty'] as num);
     }
     return total;
   }

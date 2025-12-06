@@ -1,11 +1,13 @@
+// lib/pages/order/order_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/cart_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'struk_page.dart';
+import './struk_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class OrderPage extends StatefulWidget {
   final String? orderMethod;
@@ -23,31 +25,34 @@ class _OrderPageState extends State<OrderPage> {
   final TextEditingController addressController = TextEditingController();
   final TextEditingController tableController = TextEditingController();
 
+  // State
   bool isLoading = false;
 
   // Voucher
   List<Map<String, dynamic>> voucherList = [];
   Map<String, dynamic>? voucherApplied;
   bool voucherDropdown = false;
-  double discountAmount = 0;
+  double discountAmount = 0.0;
 
-  // Payment
-  String paymentMethod = "tunai";
+  // Payment & method
+  String paymentMethod = ""; // "tunai" or "non_tunai"
+  late String orderMethodLocal;
 
-  // Local derived values (read from widget or route arguments)
-  late String orderMethodLocal; // "makan_di_tempat" | "bungkus" | "diantar"
+  // route args (optional)
   double? argsSubtotal;
   List? argsItems;
-
   bool _didReadRouteArgs = false;
 
-  // API endpoints
+  // URLs (sesuaikan bila perlu)
   final String vouchersUrl =
       'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/vouchers';
   final String applyVoucherUrl =
       'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/vouchers/apply';
+  final String createOrderUrl =
+      'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/order';
 
-  final NumberFormat _cur = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+  final NumberFormat _cur =
+      NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
   @override
   void initState() {
@@ -63,77 +68,76 @@ class _OrderPageState extends State<OrderPage> {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args != null && args is Map) {
         final m = args["method"];
-        if (m is String && m.isNotEmpty) {
-          orderMethodLocal = m;
-        }
+        if (m is String && m.isNotEmpty) orderMethodLocal = m;
         final s = args["subtotal"];
         if (s != null) {
           try {
-            argsSubtotal =
-                (s is num) ? s.toDouble() : double.parse(s.toString());
+            argsSubtotal = (s is num) ? s.toDouble() : double.parse(s.toString());
           } catch (_) {
             argsSubtotal = null;
           }
         }
         final it = args["items"];
-        if (it is List) {
-          argsItems = it;
-        }
+        if (it is List) argsItems = it;
       }
       _didReadRouteArgs = true;
     }
   }
 
-  // ============================================================
-  // API GET VOUCHER
-  // ============================================================
   Future<void> fetchVouchers() async {
     try {
       final res = await http.get(Uri.parse(vouchersUrl));
-      if (res.statusCode != 200) {
-        debugPrint('Voucher GET HTTP ${res.statusCode}: ${res.body}');
-        return;
-      }
+      if (res.statusCode != 200) return;
       final data = json.decode(res.body);
-
       List parsed = [];
-
       if (data is List) {
         parsed = data;
       } else if (data is Map) {
         if (data["vouchers"] is List) {
           parsed = data["vouchers"];
-        } else if (data["data"] is List) {
-          parsed = data["data"];
-        } else if (data["results"] is List) {
-          parsed = data["results"];
-        } else {
-          parsed = [data];
-        }
-      } else {
-        debugPrint("Voucher API unexpected type: ${data.runtimeType}");
+        } else if (data["data"] is List) parsed = data["data"];
+        else parsed = [data];
       }
-
       final safeList = parsed
-          .where((e) => e is Map)
+          .whereType<Map>()
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
           .toList();
-
-      setState(() => voucherList = safeList);
-      debugPrint("Voucher fetched: ${voucherList.length}");
+      if (mounted) setState(() => voucherList = safeList);
     } catch (e) {
-      debugPrint("Voucher API Exception: $e");
+      // ignore fetch errors silently (could show msg)
     }
   }
 
-  // Helper: dapatkan title voucher
-  String _voucherTitle(Map<String, dynamic> v) {
-    return (v['title'] ?? v['name'] ?? v['nama'] ?? v['label'] ?? '-').toString();
+  bool isVoucherUsable(Map<String, dynamic> v, double subtotal) {
+    final now = DateTime.now();
+    if (v["startDate"] != null) {
+      final start = DateTime.tryParse(v["startDate"].toString());
+      if (start != null && now.isBefore(start)) return false;
+    }
+    if (v["endDate"] != null) {
+      final end = DateTime.tryParse(v["endDate"].toString());
+      if (end != null && now.isAfter(end)) return false;
+    }
+    if (subtotal < _voucherMinOrder(v)) return false;
+    if (v["sisaHariIni"] != null &&
+        v["sisaHariIni"].toString().toLowerCase() != "unlimited") {
+      int sisa = int.tryParse(v["sisaHariIni"].toString()) ?? 0;
+      if (sisa <= 0) return false;
+    }
+    return true;
   }
 
-  // Helper: minimal order
   double _voucherMinOrder(Map<String, dynamic> v) {
-    final possibleKeys = ['minimumOrder', 'minOrder', 'min_order', 'minPurchase', 'minimum_order', 'minimum'];
+    final possibleKeys = [
+      'minimumOrder',
+      'minOrder',
+      'min_order',
+      'minPurchase',
+      'minimum_order',
+      'minimum',
+      'minPurchaseValue',
+      'min'
+    ];
     for (final k in possibleKeys) {
       if (v.containsKey(k) && v[k] != null) {
         try {
@@ -146,246 +150,479 @@ class _OrderPageState extends State<OrderPage> {
     return 0.0;
   }
 
-  // Helper: safe ambil id
-  String _voucherId(Map<String, dynamic> v) {
-    return (v['_id'] ?? v['id'] ?? v['voucherId'] ?? '').toString();
-  }
-
   String _formatMoney(double value) => _cur.format(value);
 
-  // ============================================================
-  // APPLY VOUCHER (CALL BACKEND API) — robust parsing
-  // ============================================================
+  String voucherTitleText(Map<String, dynamic> v) {
+    final name = v["nama"] ?? v["title"] ?? "Voucher";
+    final type = (v["discountType"] ?? "").toString().toLowerCase();
+    final value = v["discountValue"] ?? v["discount"] ?? v["nominal"];
+    if (type == "percent" && value != null) return "DISKON $name ${value.toString()}%";
+    if (value != null) {
+      final parsed = double.tryParse(value.toString());
+      if (parsed != null) return "DISKON $name ${_formatMoney(parsed)}";
+    }
+    return "DISKON $name";
+  }
+
+  String voucherTypeText(Map<String, dynamic> v) {
+    final type = (v["discountType"] ?? "").toString().toLowerCase();
+    final value = v["discountValue"] ?? v["discount"] ?? v["nominal"];
+    if (type == "percent" && value != null) return "${value.toString()}%";
+    if (value != null) {
+      final parsed = double.tryParse(value.toString());
+      if (parsed != null) return _formatMoney(parsed);
+    }
+    return "";
+  }
+
   Future<void> applyVoucher(Map<String, dynamic> v, double subtotal) async {
-    final minOrder = _voucherMinOrder(v);
-    if (subtotal < minOrder) {
-      showMsg("Voucher ini membutuhkan minimal order ${_formatMoney(minOrder)}");
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString("token");
+
+    if (token == null || token.isEmpty) {
+      showMsg("Token tidak ditemukan. Silakan login.");
       return;
     }
 
-    final vid = _voucherId(v);
-    if (vid.isEmpty) {
-      showMsg("Voucher tidak memiliki ID yang valid");
+    final voucherId = v["_id"] ?? v["id"] ?? v["voucherId"];
+    if (voucherId == null) {
+      showMsg("Voucher tidak valid.");
       return;
     }
+
+    final body = json.encode({
+      "voucherId": voucherId,
+      "subtotal": subtotal,
+    });
+
+    try {
+      final res = await http.post(
+        Uri.parse(applyVoucherUrl),
+        headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
+        body: body,
+      );
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final data = json.decode(res.body);
+        double discount = 0;
+        if (data["discount"] != null) discount = (data["discount"] as num).toDouble();
+
+        if (mounted) {
+          setState(() {
+            voucherApplied = Map<String, dynamic>.from(v);
+            discountAmount = discount;
+            voucherDropdown = false;
+          });
+        }
+        showMsg("Voucher berhasil diterapkan! Diskon: ${_formatMoney(discountAmount)}");
+      } else {
+        // coba ambil message dari body bila ada
+        String msg = "Gagal menerapkan voucher.";
+        try {
+          final data = json.decode(res.body);
+          if (data is Map && data["message"] != null) msg = data["message"];
+        } catch (_) {}
+        showMsg(msg);
+      }
+    } catch (e) {
+      showMsg("Terjadi kesalahan. Silakan coba lagi.");
+    }
+  }
+
+  String _generateOrderCode() {
+    final now = DateTime.now();
+    return "KW-${now.millisecondsSinceEpoch}";
+  }
+
+  /// Build payload sesuai backend:
+  /// - items: mengirim field _id, name, quantity, price
+  /// - subtotal, discount, totalAmount, voucherId
+  Map<String, dynamic> buildPayload(BuildContext context, double subtotal, double totalAmount) {
+    final cart = Provider.of<CartProvider>(context, listen: false);
+    final cartItems = cart.items;
+
+    // map method & payment ke string backend
+    String methodBackend = "Makan di Tempat";
+    if (orderMethodLocal == "bungkus") methodBackend = "Bungkus";
+    if (orderMethodLocal == "diantar") methodBackend = "Diantar";
+    String paymentBackend = paymentMethod == "tunai" ? "Tunai" : "Non-Tunai";
+
+    // Prepare items
+    final items = cartItems.map((item) {
+      // item might contain different keys; support both
+      final idVal = item["_id"] ?? item["id"] ?? item["foodId"];
+      final qtyVal = item["qty"] ?? item["quantity"] ?? 1;
+      final priceVal = item["price"] is num ? item["price"] : double.tryParse('${item["price"]}') ?? 0;
+      return {
+        "_id": idVal.toString(),
+        "name": item["name"] ?? "",
+        "quantity": (qtyVal is num) ? qtyVal : int.tryParse(qtyVal.toString()) ?? 1,
+        "price": (priceVal is num) ? priceVal : double.tryParse(priceVal.toString()) ?? 0,
+      };
+    }).toList();
+
+    return {
+      "name": nameController.text.trim(),
+      "tableNumber": methodBackend == "Makan di Tempat"
+          ? (int.tryParse(tableController.text.trim()))
+          : null,
+      "phone": methodBackend == "Diantar" ? phoneController.text.trim() : null,
+      "address": methodBackend == "Diantar" ? addressController.text.trim() : null,
+      "note": noteController.text.trim(),
+      "payment": paymentBackend,
+      "method": methodBackend,
+      "items": items,
+      "subtotal": subtotal,
+      "serviceFee": (subtotal * 0.10).roundToDouble(),
+      "deliveryFee": (orderMethodLocal == "diantar") ? 10000.0 : 0.0,
+      "discount": discountAmount,
+      "voucherId": voucherApplied != null ? (voucherApplied!["_id"] ?? voucherApplied!["id"]) : null,
+      "voucherType": voucherApplied != null ? voucherTypeText(voucherApplied!) : null,
+      "totalAmount": totalAmount,
+      // tambahan lokal (tidak disimpan backend) untuk struk lokal jika perlu
+      "localOrderCode": _generateOrderCode(),
+    };
+  }
+
+  Future<void> submitOrder(double subtotal, List items) async {
+    // Validasi input
+    if (nameController.text.isEmpty) return showMsg("Nama harus diisi");
+    if (orderMethodLocal == "makan_di_tempat" && tableController.text.isEmpty) {
+      return showMsg("Nomor meja harus diisi");
+    }
+    if (orderMethodLocal == "diantar" &&
+        (phoneController.text.isEmpty || addressController.text.isEmpty)) {
+      return showMsg("Nomor telepon dan alamat wajib diisi");
+    }
+    if (paymentMethod.isEmpty) return showMsg("Pilih metode pembayaran terlebih dahulu");
+
+    setState(() => isLoading = true);
+
+    final cart = Provider.of<CartProvider>(context, listen: false);
+    final double subtotalCalc = argsSubtotal ?? cart.subtotal;
+    final double serviceFee = (subtotalCalc * 0.10).roundToDouble();
+    final double deliveryFee = (orderMethodLocal == "diantar") ? 10000.0 : 0.0;
+    double total = subtotalCalc + serviceFee + deliveryFee - discountAmount;
+    if (total < 0) total = 0;
+
+    Map<String, dynamic> payload = buildPayload(context, subtotalCalc, total);
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString("token");
+
       if (token == null || token.isEmpty) {
-        showMsg("Token tidak ditemukan");
+        showMsg("Token tidak ditemukan. Silakan login.");
+        setState(() => isLoading = false);
         return;
       }
 
-      final body = json.encode({
-        "voucherId": vid,
-        "orderTotal": subtotal,
-      });
-
       final res = await http.post(
-        Uri.parse(applyVoucherUrl),
+        Uri.parse(createOrderUrl),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
         },
-        body: body,
-      );
-
-      debugPrint("Apply voucher HTTP ${res.statusCode}: ${res.body}");
-
-      if (res.statusCode != 200 && res.statusCode != 201) {
-        final decoded = (res.body.isNotEmpty) ? json.decode(res.body) : null;
-        final msg = decoded is Map
-            ? (decoded['message'] ?? decoded['error'] ?? 'Gagal apply voucher')
-            : 'Gagal apply voucher';
-        showMsg(msg);
-        return;
-      }
-
-      final data = json.decode(res.body);
-
-      final success =
-          (data['success'] == true) || (data['ok'] == true) || (data['discount'] != null) || (data['discountAmount'] != null);
-
-      if (!success) {
-        showMsg(data['message'] ?? "Voucher tidak valid");
-        return;
-      }
-
-      // Compute discount robustly
-      double discount = 0;
-      try {
-        // Common numeric fields
-        final possibleAmountKeys = ['discount', 'discountAmount', 'discount_value', 'amount', 'value', 'nominal'];
-        bool found = false;
-        for (final k in possibleAmountKeys) {
-          if (data[k] != null) {
-            final raw = data[k];
-            if (raw is num) {
-              discount = raw.toDouble();
-              found = true;
-              break;
-            } else {
-              discount = double.tryParse(raw.toString()) ?? discount;
-              found = true;
-              break;
-            }
-          }
-        }
-
-        // If not found, maybe backend returned percentage
-        if (!found) {
-          final possiblePercentKeys = ['percent', 'percentage', 'discountPercent', 'discount_percentage'];
-          for (final k in possiblePercentKeys) {
-            if (data[k] != null) {
-              final raw = data[k];
-              double pct = (raw is num) ? raw.toDouble() : (double.tryParse(raw.toString()) ?? 0);
-              discount = subtotal * (pct / 100.0);
-              found = true;
-              break;
-            }
-          }
-        }
-
-        // As fallback, try data['voucher'] object fields
-        if (!found && data['voucher'] is Map) {
-          final voucherObj = Map<String, dynamic>.from(data['voucher']);
-          for (final k in possibleAmountKeys) {
-            if (voucherObj[k] != null) {
-              final raw = voucherObj[k];
-              if (raw is num) {
-                discount = raw.toDouble();
-                found = true;
-                break;
-              } else {
-                discount = double.tryParse(raw.toString()) ?? discount;
-                found = true;
-                break;
-              }
-            }
-          }
-          if (!found) {
-            for (final k in ['percent', 'percentage']) {
-              if (voucherObj[k] != null) {
-                final raw = voucherObj[k];
-                double pct = (raw is num) ? raw.toDouble() : (double.tryParse(raw.toString()) ?? 0);
-                discount = subtotal * (pct / 100.0);
-                found = true;
-                break;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint("Parse discount error: $e");
-        discount = 0;
-      }
-
-      // Get voucher applied detail (prefer returned voucher object)
-      Map<String, dynamic>? applied;
-      if (data['voucher'] is Map) {
-        applied = Map<String, dynamic>.from(data['voucher']);
-      } else {
-        applied = Map<String, dynamic>.from(v);
-      }
-
-      setState(() {
-        voucherApplied = applied;
-        discountAmount = discount;
-        voucherDropdown = false;
-      });
-
-      final title = _voucherTitle(voucherApplied!);
-      showMsg("Voucher $title berhasil diterapkan; diskon ${_formatMoney(discountAmount)}");
-    } catch (e) {
-      debugPrint("Apply Voucher Error: $e");
-      showMsg("Voucher gagal diterapkan");
-    }
-  }
-
-  // ============================================================
-  // SUBMIT ORDER
-  // ============================================================
-  Future<void> submitOrder(double subtotal, List items) async {
-    if (nameController.text.isEmpty) {
-      showMsg("Nama harus diisi");
-      return;
-    }
-    if (orderMethodLocal == "makan_di_tempat" && tableController.text.isEmpty) {
-      showMsg("Nomor meja harus diisi");
-      return;
-    }
-    if (orderMethodLocal == "diantar") {
-      if (phoneController.text.isEmpty || addressController.text.isEmpty) {
-        showMsg("Nomor telepon dan alamat wajib diisi");
-        return;
-      }
-    }
-
-    setState(() => isLoading = true);
-
-    double serviceFee = subtotal * 0.10;
-    double deliveryFee = orderMethodLocal == "diantar" ? 3000 : 0;
-    double total = subtotal + serviceFee + deliveryFee - discountAmount;
-    if (total < 0) total = 0;
-
-    Map<String, dynamic> payload = {
-      "name": nameController.text.trim(),
-      "method": orderMethodLocal,
-      "items": items,
-      "subtotal": subtotal,
-      "service_fee": serviceFee,
-      "delivery_fee": deliveryFee,
-      "discount": discountAmount,
-      "totalAmount": total,
-      "payment": paymentMethod,
-      "note": noteController.text.trim(),
-      "voucherId": voucherApplied?["_id"] ?? voucherApplied?['id'] ?? voucherApplied?['voucherId'] ?? "",
-      "phone": phoneController.text.trim(),
-      "address": addressController.text.trim(),
-      "tableNumber": tableController.text.trim(),
-    };
-
-    try {
-      final res = await http.post(
-        Uri.parse(
-            "https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/order/place"),
-        headers: {"Content-Type": "application/json"},
         body: json.encode(payload),
       );
 
       final data = json.decode(res.body);
-
       if (!mounted) return;
 
-      if (data["success"] == true) {
-        Provider.of<CartProvider>(context, listen: false).clearCart();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => StrukPage(order: data["order"]),
-          ),
-        );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        if (data["success"] == true) {
+          // clear cart
+          Provider.of<CartProvider>(context, listen: false).clearCart();
+
+          final returnedOrder = data["order"] ?? {};
+
+          final mergedOrder = {
+            ...Map<String, dynamic>.from(returnedOrder), // FIXED
+            "subtotal": payload["subtotal"],
+            "serviceFee": payload["serviceFee"],
+            "deliveryFee": payload["deliveryFee"],
+            "discount": payload["discount"],
+            "voucherId": payload["voucherId"],
+            "voucherType": payload["voucherType"],
+            "totalAmount": payload["totalAmount"],
+            "localOrderCode": payload["localOrderCode"],
+          };
+
+          // NOTE: ambil redirect_url dari backend
+          final redirectUrl = data["redirect_url"];
+
+        // CHECK NON TUNAI
+            if (payload["payment"] == "Non-Tunai" && redirectUrl != null) {
+              final uri = Uri.parse(redirectUrl);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+              }
+            } else {
+            // pembayaran tunai → langsung ke struk
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => StrukPage(order: mergedOrder),
+              ),
+            );
+          }
+        } else {
+          showMsg(data["message"] ?? "Gagal membuat pesanan");
+        }
       } else {
-        showMsg(data["message"] ?? "Gagal membuat pesanan");
+        // try provide server message
+        String err = data["message"] ?? "Gagal membuat pesanan (server error)";
+        showMsg(err);
       }
     } catch (e) {
-      debugPrint("Submit order error: $e");
       showMsg("Terjadi kesalahan saat submit");
     }
 
-    if (mounted) {
-      setState(() => isLoading = false);
-    }
+    if (mounted) setState(() => isLoading = false);
   }
 
   void showMsg(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // ============================================================
-  // UI
-  // ============================================================
+  Widget buildInput(TextEditingController c, String hint) {
+    return TextField(
+      controller: c,
+      decoration: InputDecoration(
+        hintText: hint,
+        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        border: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(6),
+        ),
+      ),
+    );
+  }
+
+  Widget buildTextArea(TextEditingController c, String hint) {
+    return TextField(
+      controller: c,
+      maxLines: 3,
+      decoration: InputDecoration(
+        hintText: hint,
+        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        border: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(6),
+        ),
+      ),
+    );
+  }
+
+  Widget buildVoucherDropdown(double subtotal) {
+    final title = voucherApplied != null ? voucherTitleText(voucherApplied!) : "Pilih Voucher";
+
+    return GestureDetector(
+      onTap: () => setState(() => voucherDropdown = !voucherDropdown),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: voucherApplied != null ? const Color.fromARGB(160, 88, 255, 116) : Colors.white,
+          border: Border.all(color: Colors.red, width: 1.6),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Color.fromARGB(221, 0, 0, 0),
+                ),
+              ),
+            ),
+            Icon(
+              voucherDropdown ? Icons.expand_less : Icons.expand_more,
+              color: Colors.red,
+              size: 26,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildVoucherList(double subtotal) {
+    const int initialCount = 3;
+    bool showAll = false;
+
+    return StatefulBuilder(
+      builder: (context, setStateSB) {
+        final visibleVouchers =
+            showAll ? voucherList : voucherList.take(initialCount).toList();
+
+        return Column(
+          children: [
+            ...visibleVouchers.map<Widget>((v) {
+              bool bisaPakai = isVoucherUsable(v, subtotal);
+              bool isApplied = voucherApplied?["_id"] == v["_id"];
+
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isApplied ? const Color.fromARGB(160, 88, 255, 116) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: bisaPakai ? Colors.grey.shade300 : Colors.grey.shade400,
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: bisaPakai ? Colors.red.shade300 : Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Icon(
+                        Icons.local_offer,
+                        color: bisaPakai ? Colors.red.shade800 : Colors.grey.shade600,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            voucherTitleText(v),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: bisaPakai ? Colors.black87 : Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "Min. Pembelian ${_formatMoney(_voucherMinOrder(v))}",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          if (v["endDate"] != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              "Berlaku hingga ${DateFormat("dd.MM.yyyy").format(DateTime.parse(v["endDate"]))}",
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade400,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (!isApplied)
+                      SizedBox(
+                        width: 90,
+                        child: ElevatedButton(
+                          onPressed: bisaPakai
+                              ? () async {
+                                  await applyVoucher(v, subtotal);
+                                  setStateSB(() {});
+                                  setState(() {});
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: bisaPakai ? Colors.red.shade600 : Colors.grey,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text("Pakai", style: TextStyle(fontSize: 14)),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+            if (voucherList.length > initialCount)
+              TextButton(
+                onPressed: () {
+                  setStateSB(() {
+                    showAll = !showAll;
+                  });
+                },
+                child: Text(
+                  showAll ? "Lihat Lebih Sedikit" : "Lihat Lainnya",
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget summaryRow(String left, String right, {bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Text(left, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+          const Spacer(),
+          Text(right, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+        ],
+      ),
+    );
+  }
+
+  // Handle place order (tunai vs non_tunai)
+  Future<void> handlePlaceOrder(double subtotal, List items) async {
+    if (paymentMethod.isEmpty) {
+      return showMsg("Pilih metode pembayaran terlebih dahulu");
+    }
+
+    if (paymentMethod == "tunai") {
+      await submitOrder(subtotal, items);
+      return;
+    }
+
+    // non tunai -> simulation page
+    if (paymentMethod == "non_tunai") {
+      // build a minimal payload to show on MidtransPage
+      final cart = Provider.of<CartProvider>(context, listen: false);
+      final double subtotalCalc = argsSubtotal ?? cart.subtotal;
+      final double serviceFee = (subtotalCalc * 0.10).roundToDouble();
+      final double deliveryFee = (orderMethodLocal == "diantar") ? 10000.0 : 0.0;
+      double total = subtotalCalc + serviceFee + deliveryFee - discountAmount;
+      if (total < 0) total = 0;
+
+      final payload = buildPayload(context, subtotalCalc, total);
+
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => MidtransPage(payload: payload)),
+      );
+
+      if (result == true) {
+        setState(() {
+          paymentMethod = "non_tunai";
+        });
+        await submitOrder(subtotal, items);
+      } else {
+        showMsg("Pembayaran non tunai dibatalkan.");
+      }
+      return;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
@@ -393,7 +630,7 @@ class _OrderPageState extends State<OrderPage> {
     List items = argsItems ?? cart.items;
 
     double serviceFee = subtotal * 0.10;
-    double deliveryFee = orderMethodLocal == "diantar" ? 3000 : 0;
+    double deliveryFee = orderMethodLocal == "diantar" ? 10000 : 0;
     double total = subtotal + serviceFee + deliveryFee - discountAmount;
     if (total < 0) total = 0;
 
@@ -426,13 +663,7 @@ class _OrderPageState extends State<OrderPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 10),
-            Text(
-              methodLabel,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(methodLabel, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             const SizedBox(height: 15),
             buildInput(nameController, "Nama"),
             if (orderMethodLocal == "makan_di_tempat") ...[
@@ -448,271 +679,167 @@ class _OrderPageState extends State<OrderPage> {
             const SizedBox(height: 12),
             buildTextArea(noteController, "Catatan Untuk Pesanan (Opsional)"),
             const SizedBox(height: 25),
-
-            // ================== VOUCHER ===================
-            const Text("Voucher Tersedia",
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text("Voucher Tersedia", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             buildVoucherDropdown(subtotal),
-
-            if (voucherDropdown) buildVoucherList(subtotal),
-
+            if (voucherDropdown) ...[
+              buildVoucherList(subtotal),
+            ],
             const SizedBox(height: 25),
-
-            // ================== RINGKASAN ===================
-            const Text("Ringkasan Pesanan",
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text("Ringkasan Pesanan", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
-            // Items
             ...items.map((item) {
-              int qty = (item['qty'] is int) ? item['qty'] as int : int.tryParse('${item['qty']}') ?? 1;
+              int qty = (item['qty'] is int) ? item['qty'] : int.tryParse('${item['qty']}') ?? 1;
               final price = (item['price'] is num)
                   ? (item['price'] as num).toDouble()
-                  : double.tryParse('${item['price']}') ?? 0.0;
-              final totalItemPrice = (price * qty);
-              return summaryRow("${item['name']} x$qty", _formatMoney(totalItemPrice));
+                  : double.tryParse('${item['price']}') ?? 0;
+
+              return summaryRow("${item['name']} x$qty", _formatMoney(price * qty));
             }),
-
-            summaryRow(
-              "Biaya Layanan 10%",
-              _formatMoney(serviceFee),
-            ),
-
             if (orderMethodLocal == "diantar")
-              summaryRow("Ongkir", _formatMoney(deliveryFee)),
-
-            // Diskon (jika ada)
-            if (voucherApplied != null)
+              summaryRow("Ongkos Kirim", _formatMoney(deliveryFee)),
+            summaryRow("Biaya Layanan 10%", _formatMoney(serviceFee)),
+            if (discountAmount > 0)
               summaryRow(
-                "Diskon (${_voucherTitle(voucherApplied!)})",
-                "- ${_formatMoney(discountAmount)}",
-              ),
+                  "Voucher Diskon ${voucherApplied != null ? voucherTypeText(voucherApplied!) : ''}",
+                  "-${_formatMoney(discountAmount)}"),
+            const Divider(thickness: 1, color: Colors.grey),
+            summaryRow("Total", _formatMoney(total), bold: true),
+            const SizedBox(height: 30),
 
-            const Divider(),
-            summaryRow(
-              "TOTAL",
-              _formatMoney(total),
-              bold: true,
-            ),
-
-            const SizedBox(height: 25),
-
-            // ================== PEMBAYARAN ===================
-            const Text("Pilih Metode Pembayaran",
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text("Pilih Metode Pembayaran", style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
             Row(
               children: [
-                Radio(
-                  value: "tunai",
-                  groupValue: paymentMethod,
-                  activeColor: Colors.red,
-                  onChanged: (v) => setState(() => paymentMethod = v.toString()),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      paymentMethod = "tunai";
+                    }),
+                    child: Row(
+                      children: [
+                        Radio<String>(
+                          value: "tunai",
+                          groupValue: paymentMethod,
+                          onChanged: (v) => setState(() {
+                            paymentMethod = v ?? "";
+                          }),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text("Tunai"),
+                      ],
+                    ),
+                  ),
                 ),
-                const Text("Tunai"),
-                const SizedBox(width: 20),
-                Radio(
-                  value: "non_tunai",
-                  groupValue: paymentMethod,
-                  activeColor: Colors.red,
-                  onChanged: (v) => setState(() => paymentMethod = v.toString()),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      paymentMethod = "non_tunai";
+                    }),
+                    child: Row(
+                      children: [
+                        Radio<String>(
+                          value: "non_tunai",
+                          groupValue: paymentMethod,
+                          onChanged: (v) => setState(() {
+                            paymentMethod = v ?? "";
+                          }),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text("Non Tunai"),
+                      ],
+                    ),
+                  ),
                 ),
-                const Text("Non Tunai"),
               ],
             ),
+            const SizedBox(height: 18),
 
-            const SizedBox(height: 25),
-
-            // ================== BUTTON ===================
             SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 55,
               child: ElevatedButton(
+                onPressed: isLoading ? null : () => handlePlaceOrder(subtotal, items),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                onPressed: isLoading ? null : () => submitOrder(subtotal, items),
-                child: isLoading
-                    ? const CircularProgressIndicator(
-                        color: Colors.white,
-                      )
-                    : const Text(
-                        "Pesan",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
+                child: Text(isLoading ? "Memproses..." : "Pesan Sekarang"),
               ),
             ),
-
             const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
+}
 
-  // ============================================================
-  // WIDGET BUILDER
-  // ============================================================
-  Widget buildInput(TextEditingController c, String hint) {
-    return TextField(
-      controller: c,
-      decoration: InputDecoration(
-        hintText: hint,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        border: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.grey.shade400),
-          borderRadius: BorderRadius.circular(6),
-        ),
+// Halaman simulasi Midtrans (pura-pura)
+class MidtransPage extends StatelessWidget {
+  final Map<String, dynamic> payload;
+  const MidtransPage({super.key, required this.payload});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = payload["items"] as List<dynamic>? ?? [];
+    final total = payload["totalAmount"] ?? 0;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Midtrans (Simulasi)"),
+        backgroundColor: Colors.red,
       ),
-    );
-  }
-
-  Widget buildTextArea(TextEditingController c, String hint) {
-    return TextField(
-      controller: c,
-      maxLines: 3,
-      decoration: InputDecoration(
-        hintText: hint,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        border: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.grey.shade400),
-          borderRadius: BorderRadius.circular(6),
-        ),
-      ),
-    );
-  }
-
-  Widget buildVoucherDropdown(double subtotal) {
-    final title = voucherApplied != null ? _voucherTitle(voucherApplied!) : "Pilih Voucher";
-    return GestureDetector(
-      onTap: () => setState(() => voucherDropdown = !voucherDropdown),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade400),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
           children: [
+            const Text("Halaman ini hanya simulasi Midtrans.\nKlik 'Selesaikan Pembayaran' untuk melanjutkan."),
+            const SizedBox(height: 12),
             Expanded(
-              child: Row(
+              child: ListView(
                 children: [
-                  Text(title),
-                  const SizedBox(width: 8),
-                  if (voucherApplied != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.shade700),
-                      ),
-                      child: Row(
-                        children: [
-                          Text("Dipakai", style: TextStyle(color: Colors.green.shade700, fontSize: 12)),
-                          const SizedBox(width: 6),
-                          const Icon(Icons.check_box, size: 16, color: Colors.green),
-                        ],
-                      ),
-                    ),
+                  ...items.map((it) {
+                    final qty = it['quantity'] ?? it['qty'] ?? 1;
+                    final price = (it['price'] is num) ? it['price'] : double.tryParse('${it['price']}') ?? 0;
+                    return ListTile(
+                      title: Text("${it['name']} x$qty"),
+                      trailing: Text("Rp ${(price * qty).toStringAsFixed(0)}"),
+                    );
+                  }),
+                  const Divider(),
+                  ListTile(
+                    title: const Text("Total"),
+                    trailing: Text("Rp ${total.toStringAsFixed(0)}"),
+                  ),
                 ],
               ),
             ),
-            Icon(voucherDropdown ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  // Return true untuk menandakan pembayaran berhasil di simulasi
+                  Navigator.pop(context, true);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text("Selesaikan Pembayaran (Simulasi)"),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.pop(context, false);
+                },
+                child: const Text("Batal"),
+              ),
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget buildVoucherList(double subtotal) {
-    return Column(
-      children: [
-        const SizedBox(height: 10),
-        if (voucherList.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(12),
-            alignment: Alignment.centerLeft,
-            child: const Text("Tidak ada voucher tersedia"),
-          ),
-        for (var v in voucherList)
-          Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.red.shade300),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    "${_voucherTitle(v)}\nMin. Order ${_formatMoney(_voucherMinOrder(v))}",
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (voucherApplied != null && _voucherId(voucherApplied!) == _voucherId(v))
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.green.shade700),
-                    ),
-                    child: Row(
-                      children: [
-                        Text("Dipakai", style: TextStyle(color: Colors.green.shade700)),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.check_circle, color: Colors.green, size: 18),
-                      ],
-                    ),
-                  )
-                else
-                  ElevatedButton(
-                    onPressed: subtotal < _voucherMinOrder(v)
-                        ? null
-                        : () => applyVoucher(v, subtotal),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: subtotal < _voucherMinOrder(v) ? Colors.grey : Colors.red,
-                      minimumSize: const Size(70, 35),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                    ),
-                    child: Text(
-                      subtotal < _voucherMinOrder(v) ? "Tidak bisa" : "Pakai",
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  )
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget summaryRow(String left, String right, {bool bold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Text(
-            left,
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            right,
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ],
       ),
     );
   }

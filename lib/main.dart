@@ -55,11 +55,14 @@ class MyApp extends StatelessWidget {
         '/regist': (context) => const RegisterPage(),
         '/cart': (context) => const CartPage(),
 
-        // ✅ ORDER PAGE HARUS PUNYA PARAMETER orderMethod
+        // ORDER PAGE
         '/order': (context) => const OrderPage(orderMethod: "makan_di_tempat"),
 
-        // ✅ STRUK PAGE HARUS ADA PARAMETER order YANG VALID
-        '/struk': (context) => const StrukPage(order: {}),
+        // STRUK fallback
+        '/struk': (context) => StrukPage(order: const {}),
+
+        // ⬇️⬇️ DITAMBAHKAN (INI YANG BIKIN TOMBOL JADI BISA DIPENCET)
+        '/pesanan': (context) => const PesananPage(),
       },
     );
   }

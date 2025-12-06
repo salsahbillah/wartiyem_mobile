@@ -45,8 +45,9 @@ class Food {
 
   factory Food.fromJson(Map<String, dynamic> j) {
     double parsedPrice = 0;
-    if (j['price'] is int) parsedPrice = (j['price'] as int).toDouble();
-    else if (j['price'] is double) parsedPrice = j['price'];
+    if (j['price'] is int) {
+      parsedPrice = (j['price'] as int).toDouble();
+    } else if (j['price'] is double) parsedPrice = j['price'];
     else if (j['price'] is String) parsedPrice = double.tryParse(j['price']) ?? 0;
 
     return Food(

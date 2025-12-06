@@ -1,4 +1,3 @@
-// menu_page.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -26,8 +25,6 @@ class Food {
   int totalReviews;
   Map<String, int> ratingCounts;
 
-  int qty;
-
   Food({
     required this.id,
     required this.name,
@@ -39,13 +36,13 @@ class Food {
     this.avgRating = 0.0,
     this.totalReviews = 0,
     Map<String, int>? ratingCounts,
-    this.qty = 0,
   }) : ratingCounts = ratingCounts ?? {};
 
   factory Food.fromJson(Map<String, dynamic> j) {
     double parsedPrice = 0;
-    if (j['price'] is int) parsedPrice = (j['price'] as int).toDouble();
-    else if (j['price'] is double) parsedPrice = j['price'];
+    if (j['price'] is int) {
+      parsedPrice = (j['price'] as int).toDouble();
+    } else if (j['price'] is double) parsedPrice = j['price'];
     else if (j['price'] is String) parsedPrice = double.tryParse(j['price']) ?? 0;
 
     return Food(
@@ -61,7 +58,6 @@ class Food {
       ratingCounts: (j['ratingCounts'] is Map)
           ? Map<String, int>.from(j['ratingCounts'])
           : {},
-      qty: j['qty'] is int ? j['qty'] : 0,
     );
   }
 
@@ -131,7 +127,7 @@ class ApiService {
 
 
 // ===================================================
-// MENU PAGE (UPDATE: CART DENGAN DESCRIPTION + QTY)
+// MENU PAGE — FIXED VERSION
 // ===================================================
 class MenuPage extends StatefulWidget {
   const MenuPage({super.key});
@@ -151,6 +147,10 @@ class _MenuPageState extends State<MenuPage> {
     _loadMenusFromApi();
   }
 
+
+  // ===================================================
+  // LOAD DATA
+  // ===================================================
   Future<void> _loadMenusFromApi() async {
     setState(() {
       isLoading = true;
@@ -197,33 +197,48 @@ class _MenuPageState extends State<MenuPage> {
   }
 
 
-  // ============= COUNT KERANJANG DI TOP BAR ===========
-  int get totalCartItems {
-    final provider = Provider.of<CartProvider>(context, listen: false);
-    return provider.items.length;
+  // ===================================================
+  // GET QTY FROM CART
+  // ===================================================
+  int getQtyFromCart(String id) {
+    final cart = Provider.of<CartProvider>(context, listen: false).items;
+    final item = cart.firstWhere(
+        (e) => e['id'] == id,
+        orElse: () => {});
+    return item.isNotEmpty ? item['qty'] : 0;
   }
 
 
   // ===================================================
-  // ADD KE CART (BARU) — include description & qty
+  // ADD / REMOVE ITEMS
   // ===================================================
   void addToCart(Food f) {
-    Provider.of<CartProvider>(context, listen: false).addItem({
-      "id": f.id,
-      "name": f.name,
-      "description": f.description,
-      "price": f.price,
-      "qty": 1,
-      "image": f.resolvedImageUrl(ApiService.base),
-      "total": f.price * 1,
-    });
+  Provider.of<CartProvider>(context, listen: false).addItem({
+    "_id": f.id,             // <-- pake _id
+    "name": f.name,
+    "description": f.description,
+    "price": f.price,
+    "qty": 1,
+    "image": f.resolvedImageUrl(ApiService.base),
+    "total": f.price * 1,
+  });
+    setState(() {}); // refresh qty UI
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("${f.name} ditambahkan ke keranjang")),
-    );
+  void removeFromCart(Food f) {
+    final provider = Provider.of<CartProvider>(context, listen: false);
+    final index = provider.items.indexWhere((e) => e['id'] == f.id);
+
+    if (index != -1) {
+      provider.updateQty(index, provider.items[index]['qty'] - 1);
+      setState(() {});
+    }
   }
 
 
+  // ===================================================
+  // MENU CARD
+  // ===================================================
   Widget _buildMenuCard(Food f) {
     return MenuCard(
       nama: f.name,
@@ -231,24 +246,26 @@ class _MenuPageState extends State<MenuPage> {
       harga: FormatHelper.price(f.price),
       status: f.status,
       rating: f.avgRating,
-      qty: f.qty,
+      qty: getQtyFromCart(f.id),
       imagePath: f.resolvedImageUrl(ApiService.base),
       onAdd: () => addToCart(f),
-      onRemove: () {},
+      onRemove: () => removeFromCart(f),
     );
   }
 
 
   // ===================================================
-  // BUILD UI
+  // UI
   // ===================================================
   @override
   Widget build(BuildContext context) {
+    final cartLength = Provider.of<CartProvider>(context).items.length;
+
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            TopBar(totalCartItems: totalCartItems),
+            TopBar(totalCartItems: cartLength),
 
             if (isLoading)
               const Expanded(child: Center(child: CircularProgressIndicator()))
@@ -256,13 +273,11 @@ class _MenuPageState extends State<MenuPage> {
               Expanded(
                 child: Center(
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(errorMessage!),
-                      const SizedBox(height: 12),
                       ElevatedButton(
                         onPressed: _loadMenusFromApi,
-                        child: const Text("Coba Lagi"),
+                        child: const Text("Coba lagi"),
                       )
                     ],
                   ),
@@ -273,7 +288,7 @@ class _MenuPageState extends State<MenuPage> {
                 child: RefreshIndicator(
                   onRefresh: _loadMenusFromApi,
                   child: ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 90),
+                    padding: const EdgeInsets.only(bottom: 100),
                     itemCount: semuaMenu.length,
                     itemBuilder: (context, sectionIndex) {
                       final kategori = semuaMenu[sectionIndex];
@@ -283,8 +298,7 @@ class _MenuPageState extends State<MenuPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             child: Text(
                               kategori["kategori"],
                               style: GoogleFonts.poppins(
@@ -294,13 +308,13 @@ class _MenuPageState extends State<MenuPage> {
                               ),
                             ),
                           ),
+
                           GridView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: items.length,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
                               childAspectRatio: 0.60,
                               crossAxisSpacing: 12,
@@ -315,7 +329,7 @@ class _MenuPageState extends State<MenuPage> {
                     },
                   ),
                 ),
-              ),
+              )
           ],
         ),
       ),
