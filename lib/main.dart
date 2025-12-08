@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/cart_provider.dart';
+import 'providers/search_provider.dart'; // <-- WAJIB DITAMBAHKAN
 
 import 'pages/landing_page.dart';
 import 'pages/login.dart';
@@ -20,6 +21,7 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(create: (_) => SearchProvider()), // <-- DITAMBAHKAN
       ],
       child: const MyApp(),
     ),
@@ -61,7 +63,7 @@ class MyApp extends StatelessWidget {
         // STRUK fallback
         '/struk': (context) => StrukPage(order: const {}),
 
-        // ⬇️⬇️ DITAMBAHKAN (INI YANG BIKIN TOMBOL JADI BISA DIPENCET)
+        // PESANAN PAGE
         '/pesanan': (context) => const PesananPage(),
       },
     );

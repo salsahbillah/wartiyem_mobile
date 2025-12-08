@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/search_provider.dart';
 import 'package:wartiyem_mobile/widgets/topbar.dart';
 import 'package:wartiyem_mobile/widgets/menu_card.dart';
 import '../services/format.dart';
@@ -40,9 +41,8 @@ class Food {
 
   factory Food.fromJson(Map<String, dynamic> j) {
     double parsedPrice = 0;
-    if (j['price'] is int) {
-      parsedPrice = (j['price'] as int).toDouble();
-    } else if (j['price'] is double) parsedPrice = j['price'];
+    if (j['price'] is int) parsedPrice = (j['price']).toDouble();
+    else if (j['price'] is double) parsedPrice = j['price'];
     else if (j['price'] is String) parsedPrice = double.tryParse(j['price']) ?? 0;
 
     return Food(
@@ -53,7 +53,7 @@ class Food {
       status: j['status'],
       image: j['image'] ?? j['imagePath'] ?? '',
       category: j['category'] ?? j['kategori'] ?? 'Umum',
-      avgRating: (j['avgRating'] is num) ? (j['avgRating'] as num).toDouble() : 0.0,
+      avgRating: (j['avgRating'] is num) ? (j['avgRating']).toDouble() : 0.0,
       totalReviews: j['totalReviews'] is int ? j['totalReviews'] : 0,
       ratingCounts: (j['ratingCounts'] is Map)
           ? Map<String, int>.from(j['ratingCounts'])
@@ -63,22 +63,16 @@ class Food {
 
   String resolvedImageUrl(String baseUrl) {
     if (image.toLowerCase().startsWith('http')) return image;
-    final base = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
+    final base = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
     return '$base/images/$image';
   }
 
   void mergeRating(Map<String, dynamic> agg) {
     if (agg.containsKey('avgRating')) {
-      avgRating = (agg['avgRating'] is num)
-          ? (agg['avgRating'] as num).toDouble()
-          : avgRating;
+      avgRating = (agg['avgRating'] as num).toDouble();
     }
     if (agg.containsKey('totalReviews')) {
-      totalReviews = agg['totalReviews'] is int
-          ? agg['totalReviews']
-          : totalReviews;
+      totalReviews = agg['totalReviews'] is int ? agg['totalReviews'] : totalReviews;
     }
     if (agg.containsKey('ratingCounts') && agg['ratingCounts'] is Map) {
       ratingCounts = Map<String, int>.from(agg['ratingCounts']);
@@ -127,7 +121,7 @@ class ApiService {
 
 
 // ===================================================
-// MENU PAGE — FIXED VERSION
+// MENU PAGE WITH SEARCH
 // ===================================================
 class MenuPage extends StatefulWidget {
   const MenuPage({super.key});
@@ -146,7 +140,6 @@ class _MenuPageState extends State<MenuPage> {
     super.initState();
     _loadMenusFromApi();
   }
-
 
   // ===================================================
   // LOAD DATA
@@ -196,33 +189,29 @@ class _MenuPageState extends State<MenuPage> {
     }
   }
 
-
   // ===================================================
   // GET QTY FROM CART
   // ===================================================
   int getQtyFromCart(String id) {
     final cart = Provider.of<CartProvider>(context, listen: false).items;
-    final item = cart.firstWhere(
-        (e) => e['id'] == id,
-        orElse: () => {});
+    final item = cart.firstWhere((e) => e['id'] == id, orElse: () => {});
     return item.isNotEmpty ? item['qty'] : 0;
   }
-
 
   // ===================================================
   // ADD / REMOVE ITEMS
   // ===================================================
   void addToCart(Food f) {
-  Provider.of<CartProvider>(context, listen: false).addItem({
-    "_id": f.id,             // <-- pake _id
-    "name": f.name,
-    "description": f.description,
-    "price": f.price,
-    "qty": 1,
-    "image": f.resolvedImageUrl(ApiService.base),
-    "total": f.price * 1,
-  });
-    setState(() {}); // refresh qty UI
+    Provider.of<CartProvider>(context, listen: false).addItem({
+      "_id": f.id,
+      "name": f.name,
+      "description": f.description,
+      "price": f.price,
+      "qty": 1,
+      "image": f.resolvedImageUrl(ApiService.base),
+      "total": f.price * 1,
+    });
+    setState(() {});
   }
 
   void removeFromCart(Food f) {
@@ -234,7 +223,6 @@ class _MenuPageState extends State<MenuPage> {
       setState(() {});
     }
   }
-
 
   // ===================================================
   // MENU CARD
@@ -253,13 +241,13 @@ class _MenuPageState extends State<MenuPage> {
     );
   }
 
-
   // ===================================================
   // UI
   // ===================================================
   @override
   Widget build(BuildContext context) {
     final cartLength = Provider.of<CartProvider>(context).items.length;
+    final query = context.watch<SearchProvider>().query;
 
     return Scaffold(
       body: SafeArea(
@@ -292,13 +280,32 @@ class _MenuPageState extends State<MenuPage> {
                     itemCount: semuaMenu.length,
                     itemBuilder: (context, sectionIndex) {
                       final kategori = semuaMenu[sectionIndex];
-                      final items = kategori["items"] as List<Food>;
+                      final originalItems = kategori["items"] as List<Food>;
+
+                      // 🔍 FILTER SEARCH
+                      final filtered = originalItems.where((f) {
+                        final name = f.name.toLowerCase();
+                        final desc = f.description.toLowerCase();
+                        final price = f.price.toString();
+                        final cat = f.category.toLowerCase();
+
+                        return query.isEmpty ||
+                            name.contains(query) ||
+                            desc.contains(query) ||
+                            price.contains(query) ||
+                            cat.contains(query);
+                      }).toList();
+
+                      // Kategori kosong → jangan ditampilkan
+                      if (filtered.isEmpty) return const SizedBox();
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Title kategori
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
                             child: Text(
                               kategori["kategori"],
                               style: GoogleFonts.poppins(
@@ -309,19 +316,22 @@ class _MenuPageState extends State<MenuPage> {
                             ),
                           ),
 
+                          // Grid item
                           GridView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: items.length,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            itemCount: filtered.length,
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
                               childAspectRatio: 0.60,
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 16,
                             ),
                             itemBuilder: (c, i) {
-                              return _buildMenuCard(items[i]);
+                              return _buildMenuCard(filtered[i]);
                             },
                           )
                         ],
