@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/search_provider.dart';
 import 'package:wartiyem_mobile/widgets/topbar.dart';
 import 'package:wartiyem_mobile/widgets/menu_card.dart';
 import '../services/format.dart';
@@ -70,9 +71,7 @@ class Food {
 
   void mergeRating(Map<String, dynamic> agg) {
     if (agg.containsKey('avgRating')) {
-      avgRating = (agg['avgRating'] is num)
-          ? (agg['avgRating'] as num).toDouble()
-          : avgRating;
+      avgRating = (agg['avgRating'] as num).toDouble();
     }
     if (agg.containsKey('totalReviews')) {
       totalReviews = agg['totalReviews'] is int
@@ -123,7 +122,7 @@ class ApiService {
 }
 
 // ===================================================
-// MENU PAGE — UPDATED FILTERING
+// MENU PAGE — UPDATED FILTERING + SEARCH (search aktif hanya di DEFAULT)
 // ===================================================
 class MenuPage extends StatefulWidget {
   const MenuPage({super.key});
@@ -139,7 +138,7 @@ class _MenuPageState extends State<MenuPage> {
   bool isLoading = true;
   String? errorMessage;
 
-  String selectedSortFilter = "Default";
+  String selectedSortFilter = "Default"; // pastikan tidak ke-overwrite // pastikan tidak ke-overwrite
 
   // ========== FIXED KATEGORI ORDER ==========
   final List<String> fixedCategoriesOrder = [
@@ -314,159 +313,142 @@ class _MenuPageState extends State<MenuPage> {
 
   // ===================================================
   // POPUP FILTER MINI
+  // (tidak diubah — UI kamu tetap)
   // ===================================================
   void _openFilterPopup() {
-  showDialog(
-    context: context,
-    barrierColor: Colors.black.withOpacity(0.35),
-    builder: (ctx) {
-      return Stack(
-        children: [
-          // POPUP DIPOSISIKAN KE KANAN
-          Positioned(
-            right: 12, // <<--- BIAR NGGAK NEMPEL BANGET
-            top: MediaQuery.of(context).size.height * 0.22,
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                width: 260,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
-                ),
-
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-
-                    // CLOSE BUTTON
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: GestureDetector(
-                        onTap: () => Navigator.pop(ctx),
-                        child: const Icon(Icons.close, size: 22),
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (ctx) {
+        return Stack(
+          children: [
+            Positioned(
+              right: 12,
+              top: MediaQuery.of(context).size.height * 0.22,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: 260,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(ctx),
+                          child: const Icon(Icons.close, size: 22),
+                        ),
                       ),
-                    ),
-
-                    const SizedBox(height: 6),
-                    Text(
-                      "Urutkan Berdasarkan",
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                      const SizedBox(height: 6),
+                      Text(
+                        "Urutkan Berdasarkan",
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    _filterOption("Default", "Default"),
-                    _filterOption("HighToLow", "Harga Tertinggi - Terendah"),
-                    _filterOption("LowToHigh", "Harga Terendah - Tertinggi"),
-
-                    const SizedBox(height: 2),
-                    Text(
-                      "Rating Minimal",
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                      const SizedBox(height: 10),
+                      _filterOption("Default", "Default"),
+                      _filterOption("HighToLow", "Harga Tertinggi - Terendah"),
+                      _filterOption("LowToHigh", "Harga Terendah - Tertinggi"),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Rating Minimal",
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-
-                    const SizedBox(height: 2),
-
-                    ...List.generate(5, (i) {
-                      int star = 5 - i;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() => selectedSortFilter = "rating_$star");
-                          Navigator.pop(ctx);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 3),
-                          child: Row(
-                            children: [
-                              Radio(
-                                value: "rating_$star",
-                                groupValue: selectedSortFilter,
-                                activeColor: Colors.red,
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-                                onChanged: (v) {
-                                  setState(() => selectedSortFilter = v!);
-                                  Navigator.pop(ctx);
-                                },
-                              ),
-
-                              // ICON BINTANG
-                              Row(
-                                children: List.generate(
-                                  star,
-                                  (x) => const Icon(Icons.star,
-                                      color: Colors.orange, size: 18),
-                                ) +
-                                    List.generate(
-                                      5 - star,
-                                      (x) => const Icon(Icons.star_border,
-                                          color: Colors.grey, size: 18),
-                                    ),
-                              ),
-
-                              // TEKS — hanya tampil kalau star < 5
-                              if (star < 5) ...[
+                      const SizedBox(height: 8),
+                      ...List.generate(5, (i) {
+                        int star = 5 - i;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() => selectedSortFilter = "rating_$star");
+                            Navigator.pop(ctx);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Row(
+                              children: [
+                                Radio(
+                                  value: "rating_$star",
+                                  groupValue: selectedSortFilter,
+                                  activeColor: Colors.red,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                                  onChanged: (v) {
+                                    setState(() => selectedSortFilter = v!);
+                                    Navigator.pop(ctx);
+                                  },
+                                ),
+                                Row(
+                                  children: List.generate(
+                                    star,
+                                    (x) => const Icon(Icons.star,
+                                        color: Colors.orange, size: 18),
+                                  ) +
+                                      List.generate(
+                                        5 - star,
+                                        (x) => const Icon(Icons.star_border,
+                                            color: Colors.grey, size: 18),
+                                      ),
+                                ),
                                 const SizedBox(width: 4),
                                 const Text("ke atas", style: TextStyle(fontSize: 12)),
                               ],
-                            ],
+                            ),
                           ),
-                        ),
-                      );
-                    }),
-
-                    const SizedBox(height: 16),
-
-                    // RESET BUTTON PUTIH
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() => selectedSortFilter = "Default");
-                          Navigator.pop(ctx);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() => selectedSortFilter = "Default");
+                            Navigator.pop(ctx);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          "Reset",
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.white, // <<--- TEKS JADI PUTIH
-                            fontWeight: FontWeight.bold,
+                          child: const Text(
+                            "Reset",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      );
-    },
-  );
-}
+          ],
+        );
+      },
+    );
+  }
 
   Widget _filterOption(String value, String label) {
     return Row(
@@ -491,9 +473,21 @@ class _MenuPageState extends State<MenuPage> {
   @override
   Widget build(BuildContext context) {
     final cartLength = Provider.of<CartProvider>(context).items.length;
+    final query = context.watch<SearchProvider>().query;
 
     final bool isDefault = selectedSortFilter == "Default";
-    final List<Food> filteredItems = applyFilter();
+final List<Food> filteredItems = applyFilter();
+
+// 🔥 tambahkan filtering SEARCH universal
+final String q = query.toLowerCase();
+List<Food> finalItems = filteredItems.where((f) {
+  if (q.isEmpty) return true;
+  return f.name.toLowerCase().contains(q) ||
+         f.description.toLowerCase().contains(q) ||
+         f.price.toString().contains(q) ||
+         f.category.toLowerCase().contains(q);
+}).toList();
+
 
     return Scaffold(
       body: SafeArea(
@@ -526,11 +520,30 @@ class _MenuPageState extends State<MenuPage> {
                     children: [
                       // ================================================
                       // DEFAULT MODE → tampil kategori seperti biasa
+                      // (SEARCH AKTIF DI SINI SAJA)
                       // ================================================
                       if (isDefault)
                         ...semuaMenu.map((section) {
                           final kategori = section["kategori"];
                           final items = section["items"] as List<Food>;
+
+                          // Jika ada query, filter di dalam kategori (hanya di mode Default)
+                          final visible = query.isEmpty
+                              ? items
+                              : items.where((f) {
+                                  final q = query.toLowerCase();
+                                  final name = f.name.toLowerCase();
+                                  final desc = f.description.toLowerCase();
+                                  final price = f.price.toString();
+                                  final cat = f.category.toLowerCase();
+                                  return name.contains(q) ||
+                                      desc.contains(q) ||
+                                      price.contains(q) ||
+                                      cat.contains(q);
+                                }).toList();
+
+                          if (visible.isEmpty) return const SizedBox();
+
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -574,9 +587,8 @@ class _MenuPageState extends State<MenuPage> {
 
                               GridView.builder(
                                 shrinkWrap: true,
-                                physics:
-                                    const NeverScrollableScrollPhysics(),
-                                itemCount: items.length,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: visible.length,
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 16),
                                 gridDelegate:
@@ -586,8 +598,7 @@ class _MenuPageState extends State<MenuPage> {
                                   crossAxisSpacing: 12,
                                   mainAxisSpacing: 16,
                                 ),
-                                itemBuilder: (_, i) =>
-                                    _buildMenuCard(items[i]),
+                                itemBuilder: (_, i) => _buildMenuCard(visible[i]),
                               ),
                             ],
                           );
@@ -595,6 +606,7 @@ class _MenuPageState extends State<MenuPage> {
 
                       // ======================================================
                       // FILTER MODE → kategori HILANG, jadi SATU LIST BESAR
+                      // (SEARCH TIDAK AKTIF DI SINI — hanya filter & sort)
                       // ======================================================
                       if (!isDefault) ...[
                         // TITLE FILTER
@@ -637,9 +649,8 @@ class _MenuPageState extends State<MenuPage> {
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: filteredItems.length,
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: finalItems.length,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
@@ -647,8 +658,7 @@ class _MenuPageState extends State<MenuPage> {
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 16,
                           ),
-                          itemBuilder: (_, i) =>
-                              _buildMenuCard(filteredItems[i]),
+                          itemBuilder: (_, i) => _buildMenuCard(finalItems[i]),
                         ),
                       ],
                     ],
