@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import 'providers/cart_provider.dart';
-
 import 'pages/landing_page.dart';
 import 'pages/login.dart';
 import 'pages/register_page.dart';
