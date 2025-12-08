@@ -56,7 +56,10 @@ class _PesananPageState extends State<PesananPage> {
   }
 
   String formatCurrency(num number) {
-    return "Rp ${number.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => '.')}";
+    return "Rp ${number.toString().replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (match) => '.',
+    )}";
   }
 
   @override
@@ -72,20 +75,15 @@ class _PesananPageState extends State<PesananPage> {
       return Scaffold(
         backgroundColor: const Color(0xFFF9F9F9),
         appBar: AppBar(
-          title: const Text(
-            "Riwayat Pesanan",
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-          ),
-          centerTitle: true,
+          automaticallyImplyLeading: false, // Hapus tombol back
+          title: const Text("Riwayat Pesanan"),
           backgroundColor: Colors.white,
           elevation: 1,
-          iconTheme: const IconThemeData(color: Colors.black),
         ),
         body: Center(
           child: Text(
             errorMessage!,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.black54, fontSize: 16),
+            style: const TextStyle(color: Colors.black87),
           ),
         ),
       );
@@ -94,14 +92,14 @@ class _PesananPageState extends State<PesananPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       appBar: AppBar(
+        automaticallyImplyLeading: false, // Hapus panah kiri
         title: const Text(
           "Riwayat Pesanan",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
-        centerTitle: true,
         backgroundColor: Colors.white,
+        centerTitle: true,
         elevation: 1,
-        iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -109,9 +107,11 @@ class _PesananPageState extends State<PesananPage> {
         itemBuilder: (context, index) {
           final order = orders[index];
           final items = order["items"] as List<dynamic>? ?? [];
-          final pesananText = items.map((item) => item["name"]).join(", ");
-          final status = (order["status"] ?? "").toString().toLowerCase();
+          final pesananText = items.map((i) => i["name"]).join(", ");
           final tanggal = order["createdAt"] ?? "";
+          String status = (order["status"] ?? "").toLowerCase();
+
+          if (status != "selesai") status = "diproses";
 
           return Card(
             margin: const EdgeInsets.only(bottom: 16),
@@ -124,42 +124,115 @@ class _PesananPageState extends State<PesananPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    tanggal.replaceAll("T", " • ").substring(0, 16),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  /// =================== HEADER ===================
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        tanggal.replaceAll("T", " • ").substring(0, 16),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+
+                      /// =================== STATUS ===================
+                      Text(
+                        status == "selesai" ? "Selesai" : "Diproses",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue, // WARNA BIRU
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text("Pesanan: $pesananText"),
+
+                  const SizedBox(height: 12),
+
                   Text(
-                    "Pembayaran: ${order["payment"] ?? '-'} | Layanan: ${order["method"] ?? '-'}",
+                    "Pesanan: $pesananText",
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  Text(
+                    "Pembayaran: ${order["payment"]}   |   Layanan: ${order["method"]}",
                     style: const TextStyle(fontSize: 13),
                   ),
-                  Text(
-                    "Total: ${formatCurrency(order["totalAmount"] ?? 0)}",
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
+
                   const SizedBox(height: 10),
+
+                  /// ======== LIHAT DETAIL PINDAH KE ATAS TOTAL ========
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StrukPage(order: order),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      "Lihat Detail",
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  /// TOTAL
+                  Text(
+                    "Total: ${formatCurrency(order["totalAmount"])}",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  /// =================== BUTTONS ===================
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => StrukPage(order: order),
-                              ),
-                            );
+                            Navigator.pushNamed(context, "/menu");
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
+                            backgroundColor: Colors.green,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
-                          child: const Text("Lihat Detail"),
+                          child: const Text(
+                            "Beli Lagi",
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 10),
+
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFFF5A623),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            "Beri Rating",
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ),
                       ),
                     ],
