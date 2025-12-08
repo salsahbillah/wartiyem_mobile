@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/search_provider.dart';
+import '../providers/store_provider.dart'; // 👈 Tambahkan StoreProvider
 
 class TopBar extends StatefulWidget {
   final int totalCartItems;
@@ -30,17 +31,33 @@ class _TopBarState extends State<TopBar> {
 
   @override
   Widget build(BuildContext context) {
+    // 1. Akses StoreProvider untuk mendapatkan data User
+    final storeProvider = context.watch<StoreProvider>();
+    final user = storeProvider.user; 
+    
+    // 2. Tentukan inisial
+    String initial = '?';
+    
+    if (user != null) {
+      // Prioritas 1: Ambil inisial dari 'name'
+      if (user.name.isNotEmpty) {
+        initial = user.name[0].toUpperCase();
+      } 
+      // Prioritas 2: Fallback ke inisial dari 'email'
+      else if (user.email.isNotEmpty) {
+        initial = user.email[0].toUpperCase();
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.only(top: 32, left: 16, right: 16, bottom: 20),
       child: Row(
         children: [
+          // SEARCH BAR (Tidak Berubah)
           Expanded(
             child: TextField(
               controller: _searchController,
-
-              // ⬇️ Inilah tempat yang benar untuk dipasang
               onChanged: (v) => context.read<SearchProvider>().setQuery(v),
-
               onSubmitted: (_) => handleSearch(context),
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
@@ -58,7 +75,7 @@ class _TopBarState extends State<TopBar> {
 
           const SizedBox(width: 12),
 
-          // CART ICON
+          // CART ICON (Tidak Berubah)
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -95,15 +112,16 @@ class _TopBarState extends State<TopBar> {
 
           const SizedBox(width: 12),
 
-          // PROFILE ICON
+          // PROFILE ICON DENGAN INISIAL DINAMIS
           InkWell(
-            onTap: () => Navigator.pushNamed(context, '/profile'),
+            // 3. Rute sudah diarahkan ke '/profile' (atau '/edit-profile' jika itu yang Anda inginkan)
+            onTap: () => Navigator.pushNamed(context, '/edit-profile'),
             child: CircleAvatar(
               backgroundColor: Colors.red.shade900,
               radius: 18,
-              child: const Text(
-                "P",
-                style: TextStyle(
+              child: Text(
+                initial, // 👈 Menggunakan inisial dinamis
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),

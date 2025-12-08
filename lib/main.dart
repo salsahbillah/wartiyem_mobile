@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/cart_provider.dart';
-import 'providers/search_provider.dart'; // <-- WAJIB DITAMBAHKAN
+import 'providers/search_provider.dart';
+import 'providers/store_provider.dart'; // 👈 DITAMBAHKAN
 
 import 'pages/landing_page.dart';
 import 'pages/login.dart';
 import 'pages/register_page.dart';
 import 'pages/home_page.dart';
 import 'pages/menu_page.dart';
+import 'pages/edit_profile_screen.dart'; // 👈 DITAMBAHKAN
 import 'pages/pesanan_page.dart';
 import 'pages/tentang_kami_page.dart';
 import 'pages/cart_page.dart';
@@ -21,7 +23,8 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => CartProvider()),
-        ChangeNotifierProvider(create: (_) => SearchProvider()), // <-- DITAMBAHKAN
+        ChangeNotifierProvider(create: (_) => SearchProvider()),
+        ChangeNotifierProvider(create: (_) => StoreProvider()), // 👈 DITAMBAHKAN
       ],
       child: const MyApp(),
     ),
@@ -63,15 +66,18 @@ class MyApp extends StatelessWidget {
         // STRUK fallback
         '/struk': (context) => StrukPage(order: const {}),
 
-        // PESANAN PAGE
+        // Rute lainnya
         '/pesanan': (context) => const PesananPage(),
+        
+        // 🆕 DITAMBAHKAN: Rute Edit Profile Screen
+        '/edit-profile': (context) => EditProfileScreen(),
       },
     );
   }
 }
 
 // ============================================================
-// 👇 Controller utama setelah login
+// 👇 Controller utama setelah login (Tidak ada perubahan di sini)
 // ============================================================
 class MainController extends StatefulWidget {
   const MainController({super.key});
@@ -90,6 +96,8 @@ class _MainControllerState extends State<MainController> {
   }
 
   void logout() {
+    // Jika menggunakan StoreProvider, tambahkan logout di sini
+    // context.read<StoreProvider>().clearUser(); 
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
