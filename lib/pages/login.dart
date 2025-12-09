@@ -39,8 +39,9 @@ class _LoginPageState extends State<LoginPage> {
 
         // ⬇⬇⬇ SIMPAN TOKEN DI SINI
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("token", data["token"]);
-        // ⬆⬆⬆ WAJIB
+await prefs.setString("token", data["token"]);
+await prefs.setString("id", data["user"]["id"]);   // ⬅ WAJIB
+       
 
         widget.onLoginSuccess();
       } else {
