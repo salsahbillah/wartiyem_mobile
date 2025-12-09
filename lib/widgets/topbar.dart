@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/search_provider.dart';
-import '../providers/store_provider.dart'; // 👈 Tambahkan StoreProvider
+import '../providers/store_provider.dart'; 
 
 class TopBar extends StatefulWidget {
   final int totalCartItems;
@@ -14,6 +14,12 @@ class TopBar extends StatefulWidget {
 
 class _TopBarState extends State<TopBar> {
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void handleSearch(BuildContext context) {
     final query = _searchController.text.trim();
@@ -32,32 +38,27 @@ class _TopBarState extends State<TopBar> {
   @override
   Widget build(BuildContext context) {
     // 1. Akses StoreProvider untuk mendapatkan data User
-    final storeProvider = context.watch<StoreProvider>();
-    final user = storeProvider.user; 
+    final user = context.watch<StoreProvider>().user; 
     
-    // 2. Tentukan inisial
-    String initial = '?';
-    
-    if (user != null) {
-      // Prioritas 1: Ambil inisial dari 'name'
-      if (user.name.isNotEmpty) {
-        initial = user.name[0].toUpperCase();
-      } 
-      // Prioritas 2: Fallback ke inisial dari 'email'
-      else if (user.email.isNotEmpty) {
-        initial = user.email[0].toUpperCase();
-      }
-    }
+    // 2. Tentukan inisial secara ringkas
+    // Jika user tidak null: 
+    // Coba ambil huruf pertama dari nama. Jika nama kosong, ambil dari email. Jika email kosong, gunakan 'U'.
+    // Jika user null, gunakan 'U' (Default)
+    String initial = user != null
+      ? (user.name.isNotEmpty
+          ? user.name[0].toUpperCase()
+          : (user.email.isNotEmpty ? user.email[0].toUpperCase() : ''))
+      : '';
 
     return Padding(
       padding: const EdgeInsets.only(top: 32, left: 16, right: 16, bottom: 20),
       child: Row(
         children: [
-          // SEARCH BAR (Tidak Berubah)
+          // SEARCH BAR
           Expanded(
             child: TextField(
               controller: _searchController,
-              onChanged: (v) => context.read<SearchProvider>().setQuery(v),
+              // Langsung panggil handleSearch
               onSubmitted: (_) => handleSearch(context),
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
@@ -75,7 +76,7 @@ class _TopBarState extends State<TopBar> {
 
           const SizedBox(width: 12),
 
-          // CART ICON (Tidak Berubah)
+          // CART ICON
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -93,8 +94,8 @@ class _TopBarState extends State<TopBar> {
                   top: -4,
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Color.fromARGB(255, 192, 0, 0),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor, // Menggunakan PrimaryColor
                       shape: BoxShape.circle,
                     ),
                     child: Text(
@@ -114,13 +115,13 @@ class _TopBarState extends State<TopBar> {
 
           // PROFILE ICON DENGAN INISIAL DINAMIS
           InkWell(
-            // 3. Rute sudah diarahkan ke '/profile' (atau '/edit-profile' jika itu yang Anda inginkan)
             onTap: () => Navigator.pushNamed(context, '/edit-profile'),
             child: CircleAvatar(
-              backgroundColor: Colors.red.shade900,
+              // Warna yang lebih sesuai dengan tema yang sudah Anda tetapkan (primaryColor = merah)
+              backgroundColor: Theme.of(context).primaryColor, 
               radius: 18,
               child: Text(
-                initial, // 👈 Menggunakan inisial dinamis
+                initial, 
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

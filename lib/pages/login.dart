@@ -1,7 +1,10 @@
-import 'dart:convert';
+// lib/pages/login_page.dart
+
+import 'dart:convert'; // Tetap diperlukan untuk jsonEncode jika menggunakan http di sini, TAPI akan dihapus di versi baru
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';   // WAJIB
+// import 'package:http/http.dart' as http; // TIDAK PERLU lagi di widget
+import 'package:provider/provider.dart'; // WAJIB untuk mengakses StoreProvider
+import '../providers/store_provider.dart'; // Import StoreProvider
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -15,50 +18,49 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  bool isLoading = false;
+  
+  // State isLoading dan Error Message sekarang diurus oleh StoreProvider
+  // bool isLoading = false; // TIDAK PERLU LAGI
 
   Future<void> loginUser() async {
-    setState(() => isLoading = true);
+    // 1. Ambil instance StoreProvider
+    final storeProvider = context.read<StoreProvider>();
+    
+    // 2. Reset error message
+    storeProvider.clearErrorMessage(); // (Asumsi Anda tambahkan method ini di StoreProvider)
 
-    const String apiUrl =
-        'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/user/login';
+    // 3. Panggil fungsi login dari Provider
+    final success = await storeProvider.login(
+      emailController.text,
+      passwordController.text,
+    );
 
-    try {
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': emailController.text,
-          'password': passwordController.text,
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data['success'] == true) {
-
-        // ⬇⬇⬇ SIMPAN TOKEN DI SINI
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("token", data["token"]);
-        // ⬆⬆⬆ WAJIB
-
-        widget.onLoginSuccess();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? 'Login gagal')),
-        );
-      }
-    } catch (e) {
+    if (success) {
+      // Login berhasil, panggil callback untuk navigasi
+      widget.onLoginSuccess();
+    } else if (storeProvider.errorMessage != null) {
+      // Tampilkan error message dari provider
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan koneksi: $e')),
+        SnackBar(
+          content: Text(storeProvider.errorMessage!),
+          backgroundColor: Colors.red,
+        ),
       );
-    } finally {
-      setState(() => isLoading = false);
     }
   }
 
   @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // 🟢 Ambil state isLoading dari provider menggunakan context.watch
+    final isLoading = context.watch<StoreProvider>().isLoading;
+    
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: Padding(
@@ -73,6 +75,7 @@ class _LoginPageState extends State<LoginPage> {
                     fontWeight: FontWeight.bold,
                     color: Colors.red)),
             const SizedBox(height: 30),
+            // ... (TextFields tetap sama) ...
             TextField(
               controller: emailController,
               decoration: InputDecoration(
@@ -105,7 +108,8 @@ class _LoginPageState extends State<LoginPage> {
                   shape:
                       RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                 ),
-                onPressed: isLoading ? null : loginUser,
+                // 🟢 Menggunakan state isLoading dari StoreProvider
+                onPressed: isLoading ? null : loginUser, 
                 child: isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text(
