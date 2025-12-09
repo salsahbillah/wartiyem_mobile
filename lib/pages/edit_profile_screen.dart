@@ -4,10 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:provider/provider.dart';
 
-// Import Provider dan Model dari lokasi yang benar
 import '../providers/store_provider.dart'; 
 import '../models/user_model.dart'; 
-import '../services/user_api.dart'; 
+import '../services/user_api.dart'; // Ubah services/user_api.dart menjadi api/user_api.dart jika itu adalah path yang benar.
 
 class EditProfileScreen extends HookWidget {
   EditProfileScreen({super.key});
@@ -35,8 +34,10 @@ class EditProfileScreen extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final storeProvider = context.watch<StoreProvider>();
-    final user = storeProvider.user;
+    // Menggunakan context.read untuk StoreProvider di dalam callback/async
+    final storeProvider = context.read<StoreProvider>();
+    // Menggunakan context.watch untuk mendapatkan user dan memicu rebuild
+    final user = context.watch<StoreProvider>().user; 
 
     // State Hooks
     final activeSection = useState('profile'); // 'profile' atau 'security'
@@ -46,13 +47,15 @@ class EditProfileScreen extends HookWidget {
     });
     
     // Controllers
+    // Inisialisasi controller dengan nilai user saat ini
     final nameController = useTextEditingController(text: user?.name ?? '');
     final emailController = useTextEditingController(text: user?.email ?? '');
     final oldPasswordController = useTextEditingController();
     final newPasswordController = useTextEditingController();
     final confirmNewPasswordController = useTextEditingController();
 
-    // Sinkronisasi data awal
+    // Sinkronisasi data awal (Memastikan controller terisi saat user dimuat)
+    // Diperlukan jika data user dimuat async setelah screen dibuat
     useEffect(() {
       if (user != null) {
         nameController.text = user.name;
@@ -63,7 +66,8 @@ class EditProfileScreen extends HookWidget {
 
     // Fungsi Submit
     Future<void> handleUpdateProfile() async {
-      if (isLoading.value) return;
+      if (isLoading.value || user == null) return;
+      
       isLoading.value = true;
       
       final currentName = nameController.text.trim();
@@ -72,26 +76,46 @@ class EditProfileScreen extends HookWidget {
       final newPassword = newPasswordController.text;
       final confirmNewPassword = confirmNewPasswordController.text;
 
-      // Validasi Password
-      if (newPassword.isNotEmpty) {
-        if (newPassword != confirmNewPassword) {
-          _showToast(context, "Konfirmasi kata sandi tidak cocok!", isError: true);
-          isLoading.value = false;
-          return;
-        }
+      // 1. Validasi Password
+      if (activeSection.value == 'security' && newPassword.isNotEmpty) {
         if (oldPassword.isEmpty) {
           _showToast(context, "Harap masukkan kata sandi lama!", isError: true);
           isLoading.value = false;
           return;
         }
+        if (newPassword != confirmNewPassword) {
+          _showToast(context, "Konfirmasi kata sandi tidak cocok!", isError: true);
+          isLoading.value = false;
+          return;
+        }
+        // Validasi panjang password (minimal 8 karakter sesuai backend)
+        if (newPassword.length < 8) {
+          _showToast(context, "Kata sandi baru harus minimal 8 karakter.", isError: true);
+          isLoading.value = false;
+          return;
+        }
       }
 
-      // Filter Data
+      // 2. Filter Data (Hanya kirim yang berubah)
       final Map<String, dynamic> dataToSend = {};
-      if (currentName != user?.name) dataToSend['name'] = currentName;
-      if (currentEmail != user?.email) dataToSend['email'] = currentEmail;
       
-      if (newPassword.isNotEmpty) {
+      // Jika di bagian profil:
+      if (activeSection.value == 'profile') {
+        if (currentName != user.name) dataToSend['name'] = currentName;
+        // Tambahkan validasi email di frontend sebelum kirim
+        if (currentEmail != user.email) {
+          // Asumsi Anda menggunakan library validator
+          // if (!EmailValidator.validate(currentEmail)) {
+          //   _showToast(context, "Format email tidak valid.", isError: true);
+          //   isLoading.value = false;
+          //   return;
+          // }
+          dataToSend['email'] = currentEmail;
+        }
+      }
+      
+      // Jika di bagian security:
+      if (activeSection.value == 'security' && newPassword.isNotEmpty) {
         dataToSend['oldPassword'] = oldPassword;
         dataToSend['newPassword'] = newPassword;
       }
@@ -101,32 +125,48 @@ class EditProfileScreen extends HookWidget {
         isLoading.value = false;
         return;
       }
-
+      
+      // 3. Panggil API
       try {
-        final token = context.read<StoreProvider>().token; 
-        if (token == null) throw Exception("Token tidak ditemukan.");
+        final token = storeProvider.token; // Menggunakan storeProvider yang sudah di-read
+        if (token == null) throw Exception("Token otentikasi tidak ditemukan. Silakan login kembali.");
 
-        final updatedResponse = await apiService.updateProfile(token, dataToSend);
+        // 🟢 PERBAIKAN UTAMA DI SINI: Ganti updateProfile menjadi updateUserProfile
+        final updatedResponse = await apiService.updateUserProfile(
+          token: token,
+          name: dataToSend['name'],
+          email: dataToSend['email'],
+          oldPassword: dataToSend['oldPassword'],
+          newPassword: dataToSend['newPassword'],
+        );
         
-        storeProvider.setUser(User(
-          id: user!.id,
-          name: updatedResponse['name'] ?? user.name, 
-          email: updatedResponse['email'] ?? user.email, 
-          token: user.token,
-        ));
+        // Cek jika respons API sukses
+        if (!updatedResponse.success) {
+          throw Exception(updatedResponse.message);
+        }
+        
+        // 4. Update State Global (StoreProvider)
+        // Kita berasumsi backend mengembalikan objek user lengkap yang diperbarui
+        
+        // Ambil data user dari respons
+        final updatedUserData = updatedResponse.data as Map<String, dynamic>;
+        
+        // Menggunakan setUser untuk mengganti objek User lama dengan yang baru dari API
+        storeProvider.setUser(updatedUserData); 
         
         _showToast(context, "✅ Profil berhasil diperbarui!");
 
-        // Reset password fields
+        // 5. Reset fields
         oldPasswordController.clear();
         newPasswordController.clear();
         confirmNewPasswordController.clear();
         showPasswords.value = { 'oldPassword': false, 'newPassword': false, 'confirmNewPassword': false };
 
       } on Exception catch (e) {
+        // Menampilkan pesan error dari API (misal: "Kata sandi lama salah")
         _showToast(context, e.toString().replaceFirst('Exception: ', '❌ '), isError: true);
       } catch (e) {
-        _showToast(context, "❌ Terjadi kesalahan tidak terduga.", isError: true);
+        _showToast(context, "❌ Terjadi kesalahan tidak terduga: ${e.toString()}", isError: true);
       } finally {
         isLoading.value = false;
       }
@@ -145,8 +185,9 @@ class EditProfileScreen extends HookWidget {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // ... Bagian UI (Tidak ada perubahan) ...
     return Scaffold(
-      backgroundColor: Colors.grey.shade50, // Background sedikit abu agar Card menonjol
+      backgroundColor: Colors.grey.shade50, 
       appBar: AppBar(
         title: const Text('Edit Profil'),
         elevation: 0,
@@ -160,7 +201,7 @@ class EditProfileScreen extends HookWidget {
             const SizedBox(height: 20),
 
             // 🔽 1. DROPDOWN SELECTION (Pengganti Sidebar)
-            _buildSectionDropdown(context, activeSection),
+            _buildSectionDropdown(context, activeSection, clearPasswordFields), // Tambahkan clearPasswordFields
             
             const SizedBox(height: 20),
 
@@ -200,7 +241,7 @@ class EditProfileScreen extends HookWidget {
             ElevatedButton.icon(
               onPressed: isLoading.value ? null : handleUpdateProfile,
               icon: isLoading.value 
-                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
                   : const Icon(Icons.check_circle_outline),
               label: Text(
                 isLoading.value ? 'Menyimpan Perubahan...' : 'Simpan Perubahan',
@@ -220,6 +261,7 @@ class EditProfileScreen extends HookWidget {
     );
   }
   
+  // ... Bagian WIDGET BUILDERS (Tidak ada perubahan) ...
   // ===================================================
   // WIDGET BUILDERS
   // ===================================================
@@ -242,7 +284,7 @@ class EditProfileScreen extends HookWidget {
   }
   
   // 🔽 WIDGET BARU: DROPDOWN MENU
-  Widget _buildSectionDropdown(BuildContext context, ValueNotifier<String> activeSection) {
+  Widget _buildSectionDropdown(BuildContext context, ValueNotifier<String> activeSection, VoidCallback clearPasswordFields) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -266,6 +308,10 @@ class EditProfileScreen extends HookWidget {
           onChanged: (String? newValue) {
             if (newValue != null) {
               activeSection.value = newValue;
+              // Bersihkan field password saat berpindah ke section lain
+              if (newValue == 'profile') {
+                clearPasswordFields();
+              }
             }
           },
           items: [
@@ -295,7 +341,7 @@ class EditProfileScreen extends HookWidget {
     );
   }
 
-  Widget _buildProfileForm(BuildContext context, TextEditingController nameController, TextEditingController emailController, User user) {
+  Widget _buildProfileForm(BuildContext context, TextEditingController nameController, TextEditingController emailController, UserModel user) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -309,7 +355,7 @@ class EditProfileScreen extends HookWidget {
         const Divider(height: 30),
         _buildTextField('Nama Lengkap', nameController, Icons.person_outline, context),
         const SizedBox(height: 20),
-        _buildTextField('Alamat Email', emailController, Icons.email_outlined, context, isReadOnly: true, hint: "Email tidak dapat diubah"),
+        _buildTextField('Alamat Email', emailController, Icons.email_outlined, context, isReadOnly: false, hint: user.email), // Ubah isReadOnly menjadi false agar bisa diedit
       ],
     );
   }
