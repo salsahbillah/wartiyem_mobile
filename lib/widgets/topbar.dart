@@ -21,19 +21,23 @@ class _TopBarState extends State<TopBar> {
     super.dispose();
   }
 
-  void handleSearch(BuildContext context) {
+    void handleSearch(BuildContext context) {
     final query = _searchController.text.trim();
 
-    if (query.isNotEmpty) {
-      context.read<SearchProvider>().setQuery(query);
-
-      Navigator.pushNamed(
-        context,
-        "/menu",
-        arguments: {"search": query},
-      );
+    if (query.isEmpty) {
+      context.read<SearchProvider>().clear();
+      return;
     }
+
+    context.read<SearchProvider>().setQuery(query);
+
+    Navigator.pushNamed(
+      context,
+      "/menu",
+      arguments: {"search": query},
+    );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +62,13 @@ class _TopBarState extends State<TopBar> {
           Expanded(
             child: TextField(
               controller: _searchController,
-              // Langsung panggil handleSearch
+              onChanged: (value) {
+                if (value.trim().isEmpty) {
+                  context.read<SearchProvider>().clear();
+                } else {
+                  context.read<SearchProvider>().setQuery(value);
+                }
+              },
               onSubmitted: (_) => handleSearch(context),
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
@@ -71,8 +81,7 @@ class _TopBarState extends State<TopBar> {
                   borderRadius: BorderRadius.circular(30),
                 ),
               ),
-            ),
-          ),
+            ),          ),
 
           const SizedBox(width: 12),
 
