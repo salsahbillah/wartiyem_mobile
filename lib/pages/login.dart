@@ -1,7 +1,9 @@
+// lib/pages/login_page.dart
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';   // WAJIB
+import 'package:provider/provider.dart';
+import '../providers/store_provider.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -15,51 +17,42 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  bool isLoading = false;
 
   Future<void> loginUser() async {
-    setState(() => isLoading = true);
+    final storeProvider = context.read<StoreProvider>();
 
-    const String apiUrl =
-        'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/user/login';
+    // Reset error msg
+    storeProvider.clearErrorMessage();
 
-    try {
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': emailController.text,
-          'password': passwordController.text,
-        }),
-      );
+    // 🔥 Gunakan fungsi login dari Provider (versi yang benar)
+    final success = await storeProvider.login(
+      emailController.text,
+      passwordController.text,
+    );
 
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data['success'] == true) {
-
-        // ⬇⬇⬇ SIMPAN TOKEN DI SINI
-        final prefs = await SharedPreferences.getInstance();
-await prefs.setString("token", data["token"]);
-await prefs.setString("id", data["user"]["id"]);   // ⬅ WAJIB
-       
-
-        widget.onLoginSuccess();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? 'Login gagal')),
-        );
-      }
-    } catch (e) {
+    if (success) {
+      widget.onLoginSuccess();
+    } else if (storeProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan koneksi: $e')),
+        SnackBar(
+          content: Text(storeProvider.errorMessage!),
+          backgroundColor: Colors.red,
+        ),
       );
-    } finally {
-      setState(() => isLoading = false);
     }
   }
 
   @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isLoading = context.watch<StoreProvider>().isLoading;
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: Padding(
@@ -68,43 +61,54 @@ await prefs.setString("id", data["user"]["id"]);   // ⬅ WAJIB
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Masuk",
-                style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red)),
+            const Text(
+              "Masuk",
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
             const SizedBox(height: 30),
+
             TextField(
               controller: emailController,
               decoration: InputDecoration(
                 hintText: "Email",
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(4.0)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
                 filled: true,
                 fillColor: Colors.white,
               ),
             ),
+
             const SizedBox(height: 16),
+
             TextField(
               controller: passwordController,
               obscureText: true,
               decoration: InputDecoration(
                 hintText: "Password Akun",
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(4.0)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
                 filled: true,
                 fillColor: Colors.white,
               ),
             ),
+
             const SizedBox(height: 24),
+
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red[800],
-                  shape:
-                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                 ),
                 onPressed: isLoading ? null : loginUser,
                 child: isLoading
@@ -112,13 +116,16 @@ await prefs.setString("id", data["user"]["id"]);   // ⬅ WAJIB
                     : const Text(
                         "Masuk",
                         style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
               ),
             ),
+
             const SizedBox(height: 20),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -129,8 +136,10 @@ await prefs.setString("id", data["user"]["id"]);   // ⬅ WAJIB
                   },
                   child: const Text(
                     "Daftar Sekarang",
-                    style:
-                        TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
