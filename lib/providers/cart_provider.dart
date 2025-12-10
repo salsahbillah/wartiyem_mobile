@@ -2,8 +2,20 @@ import 'package:flutter/material.dart';
 
 class CartProvider with ChangeNotifier {
   final List<Map<String, dynamic>> _items = [];
+  String? _userId;
 
   List<Map<String, dynamic>> get items => _items;
+  String? get userId => _userId;
+
+  // ✅ DIPANGGIL DARI main.dart (ProxyProvider)
+  void setUser(String? userId) {
+    if (_userId != userId) {
+      _userId = userId;
+      _items.clear(); // ✅ reset cart saat login / logout / ganti akun
+      notifyListeners();
+    }
+  }
+
 
   void addItem(Map<String, dynamic> item) {
   int index = _items.indexWhere((e) =>

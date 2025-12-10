@@ -22,9 +22,19 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProxyProvider<StoreProvider, CartProvider>(
+          create: (_) => CartProvider(),
+          update: (_, store, cart) {
+            cart ??= CartProvider();
+
+            // ✅ INI KUNCI UTAMA
+            cart.setUser(store.user?.id);
+
+            return cart;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => SearchProvider()),
-        ChangeNotifierProvider(create: (_) => StoreProvider()),  // ✔
+        ChangeNotifierProvider(create: (_) => StoreProvider()),
       ],
       child: const MyApp(),
     ),

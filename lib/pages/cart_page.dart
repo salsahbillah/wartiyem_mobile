@@ -1,10 +1,9 @@
-// lib/pages/cart_page.dart
-// ignore: unused_import
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../services/format.dart';
+import '../providers/store_provider.dart';
+
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -339,18 +338,27 @@ class _CartPageState extends State<CartPage> {
                       borderRadius: BorderRadius.circular(10)),
                 ),
                 onPressed: canConfirm
-                    ? () {
-                        Navigator.pushNamed(
-                          context,
-                          '/order',
-                          arguments: {
-                            "method": _methodValueLabel(_selectedMethod),
-                            "subtotal": cartProvider.subtotal,
-                            "items": cartProvider.items,
-                          },
+                  ? () {
+                      final store = context.read<StoreProvider>();
+
+                      if (store.user == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Silakan login dulu")),
                         );
+                        return;
                       }
-                    : null,
+
+                      Navigator.pushNamed(
+                        context,
+                        '/order',
+                        arguments: {
+                          "method": _methodValueLabel(_selectedMethod),
+                          "subtotal": cartProvider.subtotal,
+                          "items": cartProvider.items,
+                        },
+                      );
+                    }
+    : null,
                 child: Text(
                   "Konfirmasi Pesanan",
                   style: TextStyle(
