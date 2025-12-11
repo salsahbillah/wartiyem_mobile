@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/cart_provider.dart';
-import 'providers/search_provider.dart';      // ✔ dipertahankan
-import 'providers/store_provider.dart';       // ✔ dipertahankan
+import 'providers/search_provider.dart';
+import 'providers/store_provider.dart';
 
 import 'pages/landing_page.dart';
 import 'pages/login.dart';
@@ -22,19 +22,30 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
+        /// -----------------------------------------------------
+        /// 1️⃣ StoreProvider harus paling atas (dependency utama)
+        /// -----------------------------------------------------
+        ChangeNotifierProvider(create: (_) => StoreProvider()),
+
+        /// -----------------------------------------------------
+        /// 2️⃣ CartProvider tergantung StoreProvider
+        /// -----------------------------------------------------
         ChangeNotifierProxyProvider<StoreProvider, CartProvider>(
           create: (_) => CartProvider(),
           update: (_, store, cart) {
             cart ??= CartProvider();
 
-            // ✅ INI KUNCI UTAMA
+            // Set user ID ke CartProvider setelah login
             cart.setUser(store.user?.id);
 
             return cart;
           },
         ),
+
+        /// -----------------------------------------------------
+        /// 3️⃣ SearchProvider bebas, ga ada dependency
+        /// -----------------------------------------------------
         ChangeNotifierProvider(create: (_) => SearchProvider()),
-        ChangeNotifierProvider(create: (_) => StoreProvider()),
       ],
       child: const MyApp(),
     ),
@@ -61,24 +72,26 @@ class MyApp extends StatelessWidget {
             ),
 
         '/login': (context) => LoginPage(
-              onLoginSuccess: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const MainController()),
-              ),
+              onLoginSuccess: () {
+                /// Pastikan store sudah update user sebelum masuk MainController
+                /// Ini menghilangkan error provider merah sekilas
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MainController(),
+                    ),
+                  );
+                });
+              },
             ),
 
         '/regist': (context) => const RegisterPage(),
         '/cart': (context) => const CartPage(),
-
-        // ORDER PAGE
-        '/order': (context) => const OrderPage(orderMethod: "makan_di_tempat"),
-
-        // STRUK fallback
+        '/order': (context) =>
+            const OrderPage(orderMethod: "makan_di_tempat"),
         '/struk': (context) => StrukPage(order: const {}),
-
         '/pesanan': (context) => const PesananPage(),
-
-        // Edit Profile
         '/edit-profile': (context) => EditProfileScreen(),
       },
     );
@@ -88,15 +101,27 @@ class MyApp extends StatelessWidget {
 // ============================================================
 // Controller utama setelah login
 // ============================================================
+
 class MainController extends StatefulWidget {
-  const MainController({super.key});
+  final int startIndex;
+
+  const MainController({
+    super.key,
+    this.startIndex = 0,
+  });
 
   @override
   State<MainController> createState() => _MainControllerState();
 }
 
 class _MainControllerState extends State<MainController> {
-  int currentTabIndex = 0;
+  late int currentTabIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    currentTabIndex = widget.startIndex; // ⬅ WAJIB ADA
+  }
 
   void goToTab(int index) {
     setState(() {
@@ -105,7 +130,6 @@ class _MainControllerState extends State<MainController> {
   }
 
   void logout() {
-    // context.read<StoreProvider>().clearUser();
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 

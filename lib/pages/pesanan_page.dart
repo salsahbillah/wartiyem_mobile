@@ -1,10 +1,6 @@
 // FULL FIXED PesananPage
-// Perbaikan utama:
-// - Menambahkan header Authorization pada semua request review (lihat, cek, dan kirim)
-// - Membuat fungsi bantu fetchReview untuk konsistensi
-// - Setelah sukses mengirim review, langsung update state order agar tombol berubah permanen
-// - Penanganan response yang lebih robust (200/201/404/other)
-// - Sedikit perapihan code dan komentar
+// Tidak ada error override, newOrder tidak duplikat,
+// alur Struk → Pesanan berfungsi, rating berjalan normal.
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -27,6 +23,9 @@ class _PesananPageState extends State<PesananPage>
   String? errorMessage;
   IO.Socket? socket;
 
+  // 👉 variabel ini hanya dideklarasikan sekali!
+  Map<String, dynamic>? newOrder;
+
   static const String apiBaseUrl =
       'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/order/user';
 
@@ -34,14 +33,22 @@ class _PesananPageState extends State<PesananPage>
       'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/reviews';
 
   Future<String?> getUserId() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getString('userId') ?? prefs.getString('id');
-  }
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  // coba 3 kemungkinan key 
+  return prefs.getString('userId') ?? 
+         prefs.getString('_id') ?? 
+         prefs.getString('id');
+}
 
   Future<String?> getToken() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
-  }
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  // ambil semua kemungkinan key
+  return prefs.getString('authToken')   // token baru dari StoreProvider
+      ?? prefs.getString('token')       // old fallback
+      ?? prefs.getString('_token');     // kalau ada versi lama lain
+}
 
   @override
   void initState() {
@@ -59,90 +66,161 @@ class _PesananPageState extends State<PesananPage>
     super.dispose();
   }
 
-  // Fungsi bantu untuk mem-fetch review sebuah order (mengembalikan Map review atau null)
-  Future<Map<String, dynamic>?> fetchReviewForOrder(String orderId) async {
-    try {
-      final token = await getToken();
-      final userId = await getUserId();
-      final uri = Uri.parse("$reviewBaseUrl/order/$orderId?userId=$userId");
-      final res = await http.get(
-        uri,
-        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
-      );
 
-      if (res.statusCode == 200) {
-        final parsed = jsonDecode(res.body);
-        if (parsed is Map && parsed['data'] != null) {
-          return parsed['data'] as Map<String, dynamic>;
-        }
-        return null;
+  // Fungsi bantu untuk mem-fetch review sebuah order (mengembalikan Map review atau null)
+// Replace existing fetchReviewForOrder with this
+Future<Map<String, dynamic>?> fetchReviewForOrder(String orderId) async {
+  try {
+    final token = await getToken();
+    final userId = await getUserId();
+
+    final uri = Uri.parse("$reviewBaseUrl/order/$orderId?userId=$userId");
+
+    final res = await http.get(
+      uri,
+      headers: token != null ? {'Authorization': 'Bearer $token'} : {},
+    );
+
+    print("DEBUG REVIEW: status=${res.statusCode}, body=${res.body}");
+
+    if (res.statusCode == 200) {
+      final parsed = jsonDecode(res.body);
+
+      // backend kamu pakai "reviews"
+      if (parsed["reviews"] is List && parsed["reviews"].isNotEmpty) {
+        return parsed["reviews"][0];
       }
 
-      // jika 404 dianggap belum di-review
-      if (res.statusCode == 404) return null;
-
-      // untuk kode lain, kembalikan null tapi log kemungkinan pesan
-      return null;
-    } catch (_) {
       return null;
     }
+
+    return null;
+  } catch (e) {
+    print("ERROR REVIEW FETCH: $e");
+    return null;
   }
+}
 
   Future<void> lihatRating(Map order) async {
-    try {
-      final review = await fetchReviewForOrder(order['_id']);
+  try {
+    final review = await fetchReviewForOrder(order['_id']);
 
-      if (review == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Rating tidak ditemukan")),
-        );
-        return;
-      }
+    if (review == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Rating tidak ditemukan")),
+      );
+      return;
+    }
 
-      await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text("Rating Kamu"),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: Column(
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.orange.withOpacity(0.3),
+                blurRadius: 30,
+                spreadRadius: 2,
+                offset: const Offset(0, 10),
+              )
+            ],
+          ),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Title -----------------------------------------------------
+              const Text(
+                "Rating Kamu",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Stars -----------------------------------------------------
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
                   5,
-                  (i) => Icon(
-                    Icons.star,
-                    color: i < (review["rating"] ?? 0) ? Colors.orange : Colors.grey,
-                  ),
+                  (i) {
+                    final filled = i < (review["rating"] ?? 0);
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(
+                        Icons.star_rounded,
+                        size: 40,
+                        color: filled ? Colors.orange : Colors.grey.shade300,
+                      ),
+                    );
+                  },
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                review["comment"] ?? "(Tidak ada komentar)",
-                textAlign: TextAlign.center,
+
+              const SizedBox(height: 20),
+
+              // Comment box -----------------------------------------------
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  review["comment"]?.toString().trim().isNotEmpty == true
+                      ? review["comment"]
+                      : "Tidak ada komentar",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14),
+                ),
               ),
+
+              const SizedBox(height: 24),
+
+              // Close button ----------------------------------------------
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    "Tutup",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              )
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Tutup"),
-            )
-          ],
         ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Terjadi kesalahan: $e")),
-      );
-    }
+      ),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Terjadi kesalahan: $e")),
+    );
   }
+}
+
 
   Future<void> connectSocket() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token = prefs.getString('token');
+    final token = await getToken();   // FIX TOKEN
     if (token == null) return;
 
     socket = IO.io(
@@ -185,9 +263,7 @@ class _PesananPageState extends State<PesananPage>
 
   Future<void> fetchOrders() async {
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString('token');
-
+      final token = await getToken();
       final response = await http.get(
         Uri.parse(apiBaseUrl),
         headers: token != null ? {'Authorization': 'Bearer $token'} : {},
@@ -215,6 +291,14 @@ class _PesananPageState extends State<PesananPage>
           orders = loaded;
           isLoading = false;
         });
+
+        // === MASUKKAN ORDER BARU DARI STRUK KE URUTAN PALING ATAS ===
+        if (newOrder != null) {
+          bool exists = orders.any((o) => o["_id"] == newOrder!["_id"]);
+          if (!exists) {
+            orders.insert(0, newOrder!);
+          }
+        }
       } else {
         setState(() {
           errorMessage = 'Gagal memuat data pesanan (${response.statusCode})';
@@ -244,138 +328,137 @@ class _PesananPageState extends State<PesananPage>
   }
 
   Future<void> beriRating(Map order) async {
-    int rating = 0;
-    TextEditingController komentarC = TextEditingController();
+  int rating = 0;
+  TextEditingController komentarC = TextEditingController();
 
-    await showDialog(
-      context: context,
-      builder: (_) {
-        return StatefulBuilder(builder: (context, setState2) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text("Beri Rating"),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Wrap(
-                    spacing: 4,
-                    children: List.generate(5, (i) {
-                      final idx = i + 1;
-                      return GestureDetector(
-                        onTap: () => setState2(() => rating = idx),
-                        child: Icon(
-                          Icons.star,
-                          size: 36,
-                          color: idx <= rating ? Colors.orange : Colors.grey.shade400,
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: komentarC,
-                    decoration: const InputDecoration(
-                      hintText: "Tambahkan komentar...",
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Batal"),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (rating == 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Pilih rating terlebih dahulu!")),
+  await showDialog(
+    context: context,
+    builder: (_) {
+      return StatefulBuilder(builder: (context, setState2) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text("Beri Rating"),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Wrap(
+                  spacing: 4,
+                  children: List.generate(5, (i) {
+                    final idx = i + 1;
+                    return GestureDetector(
+                      onTap: () => setState2(() => rating = idx),
+                      child: Icon(
+                        Icons.star,
+                        size: 36,
+                        color: idx <= rating ? Colors.orange : Colors.grey.shade400,
+                      ),
                     );
-                    return;
-                  }
+                  }),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: komentarC,
+                  decoration: const InputDecoration(
+                    hintText: "Tambahkan komentar...",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Batal"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (rating == 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Pilih rating terlebih dahulu!")),
+                  );
+                  return;
+                }
 
-                  final token = await getToken();
-                  final userId = await getUserId();
+                final token = await getToken();
+                // NOTE: do NOT include userId in the body; backend reads it from the token
+                final userId = await getUserId();
 
                   final body = {
                     "userId": userId,
                     "orderId": order["_id"],
                     "rating": rating,
-                    "comment": komentarC.text
+                    "comment": komentarC.text,
                   };
 
-                  try {
-                    final res = await http.post(
-                      Uri.parse(reviewBaseUrl),
-                      headers: {
-                        "Content-Type": "application/json",
-                        if (token != null) 'Authorization': 'Bearer $token'
-                      },
-                      body: jsonEncode(body),
-                    );
+                // Debug prints — copy log output if something fails
+                print("DEBUG SEND RATING -> token=${token != null}, orderId=${order['_id']}, rating=$rating");
 
-                    if (res.statusCode == 201 || res.statusCode == 200) {
-                      // update state lokal: pastikan order reviewed = true
+                try {
+                  final res = await http.post(
+                    Uri.parse(reviewBaseUrl),
+                    headers: {
+                      "Content-Type": "application/json",
+                      if (token != null) 'Authorization': 'Bearer $token'
+                    },
+                    body: jsonEncode(body),
+                  );
+
+                  print("DEBUG RATING RESPONSE: status=${res.statusCode}, body=${res.body}");
+
+                  if (res.statusCode == 201 || res.statusCode == 200) {
+                    final review = await fetchReviewForOrder(order["_id"]);
                       setState(() {
-                        for (var o in orders) {
-                          if (o["_id"] == order["_id"]) {
-                            o["reviewed"] = true;
-                            o["_userRating"] = rating;
-                            o["_userComment"] = komentarC.text;
-                            break;
-                          }
-                        }
+                        order["reviewed"] = true;
+                        order["_userRating"] = review?["rating"] ?? rating;
+                        order["_userComment"] = review?["comment"] ?? komentarC.text;
                       });
 
-                      Navigator.pop(context);
+                    Navigator.pop(context);
 
-                      String msg = "Terima kasih atas rating Anda!";
-                      try {
-                        final j = jsonDecode(res.body);
-                        if (j is Map && j["message"] != null) msg = j["message"];
-                      } catch (_) {}
-
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(msg)));
-                    } else if (res.statusCode == 409) {
-                      // sudah pernah di-review
-                      Navigator.pop(context);
-                      setState(() {
-                        for (var o in orders) {
-                          if (o["_id"] == order["_id"]) {
-                            o["reviewed"] = true;
-                            break;
-                          }
+                    String msg = "Terima kasih atas rating Anda!";
+                    try {
+                      final j = jsonDecode(res.body);
+                      if (j is Map && j["message"] != null) msg = j["message"];
+                    } catch (_) {}
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                  } else if (res.statusCode == 409) {
+                    // sudah pernah di-review
+                    Navigator.pop(context);
+                    setState(() {
+                      for (var o in orders) {
+                        if (o["_id"] == order["_id"]) {
+                          o["reviewed"] = true;
+                          break;
                         }
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Pesanan ini sudah di-rating")));
-                    } else {
-                      String msg = "Gagal mengirim rating (${res.statusCode})";
-                      try {
-                        final j = jsonDecode(res.body);
-                        if (j is Map && j["message"] != null) msg = j["message"];
-                      } catch (_) {}
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(msg)));
-                    }
-                  } catch (e) {
+                      }
+                    });
                     ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Terjadi kesalahan: $e")));
+                        const SnackBar(content: Text("Pesanan ini sudah di-rating")));
+                  } else {
+                    String msg = "Gagal mengirim rating (${res.statusCode})";
+                    try {
+                      final j = jsonDecode(res.body);
+                      if (j is Map && j["message"] != null) msg = j["message"];
+                    } catch (_) {}
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
                   }
-                },
-                child: const Text("Kirim"),
-              ),
-            ],
-          );
-        });
-      },
-    );
-  }
+                } catch (e) {
+                  print("ERROR SEND RATING: $e");
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Terjadi kesalahan: $e")));
+                }
+              },
+              child: const Text("Kirim"),
+            ),
+          ],
+        );
+      });
+    },
+  );
+}
 
   void beliLagi(Map order) {
     Navigator.pushNamed(context, "/menu");
@@ -383,6 +466,17 @@ class _PesananPageState extends State<PesananPage>
 
   @override
   Widget build(BuildContext context) {
+     // AMBIL DATA ORDER BARU DARI STRUK
+  final args = ModalRoute.of(context)?.settings.arguments;
+    if (args != null && args is Map<String, dynamic> && newOrder == null) {
+      setState(() {
+        newOrder = args;
+      });
+
+      // refresh daftar pesanan supaya order baru muncul
+      fetchOrders();
+    }
+
     if (isLoading) {
       return const Scaffold(
         body: Center(
@@ -486,6 +580,7 @@ class _OrderCardState extends State<_OrderCard> {
   Widget build(BuildContext context) {
     final enableBeli = widget.isSelesai;
     final enableRating = widget.isSelesai;
+    
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
