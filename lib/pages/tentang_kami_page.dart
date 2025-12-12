@@ -250,7 +250,7 @@ class TentangKamiPage extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(15),
                     child: Image.network(
-                      'https://maps.googleapis.com/maps/api/staticmap?center=Jl.+Ampera+No.57,+Jatibarang,+Indramayu&zoom=15&size=600x400&markers=color:red|Jl.+Ampera+No.57,+Jatibarang,+Indramayu&key=YOUR_API_KEY',
+                      'https://maps.googleapis.com/maps/api/staticmap?center=Jl.+Ampera+No.57,+Jatibarang,+Indramayu&zoom=15&size=600x400&markers=color:red|Jl.+Ampera+No.57,+Jatibarang,+Indramayu&key=AIzaSyDLLgRGwOoo8AinJ1oX6-jkHfL4F6megWo',
                       height: 200,
                       width: double.infinity,
                       fit: BoxFit.cover,
