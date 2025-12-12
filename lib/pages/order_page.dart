@@ -5,9 +5,10 @@ import '../../providers/cart_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import './struk_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../providers/store_provider.dart';
+
 
 class OrderPage extends StatefulWidget {
   final String? orderMethod;
@@ -27,6 +28,31 @@ class _OrderPageState extends State<OrderPage> {
 
   // State
   bool isLoading = false;
+
+  bool _ensureLoggedIn() {
+  final store = Provider.of<StoreProvider>(context, listen: false);
+
+  if (store.token == null ||
+      store.token!.isEmpty ||
+      store.user == null) {
+    showMsg("Silakan login terlebih dahulu");
+    return false;
+  }
+  return true;
+}
+
+
+@override
+void dispose() {
+  nameController.dispose();
+  noteController.dispose();
+  phoneController.dispose();
+  addressController.dispose();
+  tableController.dispose();
+  super.dispose();
+}
+
+
 
   // Voucher
   List<Map<String, dynamic>> voucherList = [];
@@ -86,7 +112,14 @@ class _OrderPageState extends State<OrderPage> {
 
   Future<void> fetchVouchers() async {
     try {
-      final res = await http.get(Uri.parse(vouchersUrl));
+      final store = Provider.of<StoreProvider>(context, listen: false);
+
+      final res = await http.get(
+        Uri.parse(vouchersUrl),
+        headers: store.token != null
+            ? {"Authorization": "Bearer ${store.token}"}
+            : null,
+      );
       if (res.statusCode != 200) return;
       final data = json.decode(res.body);
       List parsed = [];
@@ -176,13 +209,12 @@ class _OrderPageState extends State<OrderPage> {
   }
 
   Future<void> applyVoucher(Map<String, dynamic> v, double subtotal) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString("token");
+    if (!_ensureLoggedIn()) return;
 
-    if (token == null || token.isEmpty) {
-      showMsg("Token tidak ditemukan. Silakan login.");
-      return;
-    }
+    final store = Provider.of<StoreProvider>(context, listen: false);
+    final token = store.token!;
+
+
 
     final voucherId = v["_id"] ?? v["id"] ?? v["voucherId"];
     if (voucherId == null) {
@@ -239,7 +271,7 @@ class _OrderPageState extends State<OrderPage> {
   /// - subtotal, discount, totalAmount, voucherId
   Map<String, dynamic> buildPayload(BuildContext context, double subtotal, double totalAmount) {
     final cart = Provider.of<CartProvider>(context, listen: false);
-    final cartItems = cart.items;
+final cartItems = argsItems ?? cart.items;
 
     // map method & payment ke string backend
     String methodBackend = "Makan di Tempat";
@@ -308,14 +340,10 @@ class _OrderPageState extends State<OrderPage> {
     Map<String, dynamic> payload = buildPayload(context, subtotalCalc, total);
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString("token");
+     
 
-      if (token == null || token.isEmpty) {
-        showMsg("Token tidak ditemukan. Silakan login.");
-        setState(() => isLoading = false);
-        return;
-      }
+    final store = Provider.of<StoreProvider>(context, listen: false);
+    final token = store.token!;
 
       final res = await http.post(
         Uri.parse(createOrderUrl),
@@ -463,7 +491,9 @@ class _OrderPageState extends State<OrderPage> {
           children: [
             ...visibleVouchers.map<Widget>((v) {
               bool bisaPakai = isVoucherUsable(v, subtotal);
-              bool isApplied = voucherApplied?["_id"] == v["_id"];
+              bool isApplied =
+              (voucherApplied?["_id"] ?? voucherApplied?["id"]) ==
+              (v["_id"] ?? v["id"]);
 
               return Container(
                 width: double.infinity,
@@ -585,9 +615,13 @@ class _OrderPageState extends State<OrderPage> {
 
   // Handle place order (tunai vs non_tunai)
   Future<void> handlePlaceOrder(double subtotal, List items) async {
-    if (paymentMethod.isEmpty) {
-      return showMsg("Pilih metode pembayaran terlebih dahulu");
-    }
+    if (!_ensureLoggedIn()) return;
+
+
+  if (paymentMethod.isEmpty) {
+    return showMsg("Pilih metode pembayaran terlebih dahulu");
+  }
+
 
     if (paymentMethod == "tunai") {
       await submitOrder(subtotal, items);

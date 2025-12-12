@@ -25,6 +25,7 @@ class Food {
   double avgRating;
   int totalReviews;
   Map<String, int> ratingCounts;
+  int qty;
 
   Food({
     required this.id,
@@ -37,6 +38,7 @@ class Food {
     this.avgRating = 0.0,
     this.totalReviews = 0,
     Map<String, int>? ratingCounts,
+    this.qty = 0,
   }) : ratingCounts = ratingCounts ?? {};
 
   factory Food.fromJson(Map<String, dynamic> j) {
@@ -58,25 +60,22 @@ class Food {
       ratingCounts: (j['ratingCounts'] is Map)
           ? Map<String, int>.from(j['ratingCounts'])
           : {},
+      qty: j['qty'] is int ? j['qty'] : 0,
     );
   }
 
   String resolvedImageUrl(String baseUrl) {
     if (image.toLowerCase().startsWith('http')) return image;
-    final base = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
+    final base = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
     return '$base/images/$image';
   }
 
   void mergeRating(Map<String, dynamic> agg) {
     if (agg.containsKey('avgRating')) {
-      avgRating = (agg['avgRating'] as num).toDouble();
+      avgRating = (agg['avgRating'] is num) ? (agg['avgRating'] as num).toDouble() : avgRating;
     }
     if (agg.containsKey('totalReviews')) {
-      totalReviews = agg['totalReviews'] is int
-          ? agg['totalReviews']
-          : totalReviews;
+      totalReviews = agg['totalReviews'] is int ? agg['totalReviews'] : totalReviews;
     }
     if (agg.containsKey('ratingCounts') && agg['ratingCounts'] is Map) {
       ratingCounts = Map<String, int>.from(agg['ratingCounts']);
@@ -88,8 +87,7 @@ class Food {
 // API SERVICE
 // ===================================================
 class ApiService {
-  static const String base =
-      'https://unflamboyant-undepreciable-emilia.ngrok-free.dev';
+  static const String base = 'https://unflamboyant-undepreciable-emilia.ngrok-free.dev';
 
   static const String foodsEndpoint = '$base/api/food';
   static const String reviewsTopEndpoint = '$base/api/reviews/top';
@@ -122,7 +120,7 @@ class ApiService {
 }
 
 // ===================================================
-// MENU PAGE — UPDATED FILTERING + SEARCH (search aktif hanya di DEFAULT)
+// MENU PAGE — FIXED & FULL
 // ===================================================
 class MenuPage extends StatefulWidget {
   const MenuPage({super.key});
@@ -132,15 +130,14 @@ class MenuPage extends StatefulWidget {
 }
 
 class _MenuPageState extends State<MenuPage> {
-  List<Map<String, dynamic>> semuaMenu = [];
-  List<Food> allItemsFlat = [];
-
+  List<Map<String, dynamic>> semuaMenu = []; // sections: {kategori, items}
+  List<Food> allItemsFlat = []; // flattened items
   bool isLoading = true;
   String? errorMessage;
 
-  String selectedSortFilter = "Default"; // pastikan tidak ke-overwrite // pastikan tidak ke-overwrite
+  String selectedSortFilter = "Default"; // Default / HighToLow / LowToHigh / rating_3 etc.
 
-  // ========== FIXED KATEGORI ORDER ==========
+  // fixed category order (will appear first)
   final List<String> fixedCategoriesOrder = [
     "Aneka Lauk",
     "Aneka Mie",
@@ -149,10 +146,29 @@ class _MenuPageState extends State<MenuPage> {
     "Minuman",
   ];
 
+  bool _handledRouteArgs = false;
+
   @override
   void initState() {
     super.initState();
     _loadMenusFromApi();
+  }
+
+  // If navigated with arguments (e.g. TopBar -> /menu with {"search": query}),
+  // ensure SearchProvider is updated once.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_handledRouteArgs) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map && args.containsKey('search')) {
+        final q = (args['search'] ?? '').toString();
+        if (q.isNotEmpty) {
+          Provider.of<SearchProvider>(context, listen: false).setQuery(q);
+        }
+      }
+      _handledRouteArgs = true;
+    }
   }
 
   // ===================================================
@@ -168,7 +184,7 @@ class _MenuPageState extends State<MenuPage> {
       final foods = await ApiService.fetchFoods();
       final top = await ApiService.fetchTopReviews();
 
-      // gabungkan rating
+      // merge ratings
       final Map<String, Map<String, dynamic>> agg = {};
       for (final r in top) {
         final id = (r['_id'] ?? r['foodId'] ?? '')?.toString();
@@ -178,15 +194,16 @@ class _MenuPageState extends State<MenuPage> {
         if (agg.containsKey(f.id)) f.mergeRating(agg[f.id]!);
       }
 
-      // GROUPING
+      // group by category
       final Map<String, List<Food>> grouped = {};
       for (final f in foods) {
         grouped.putIfAbsent(f.category, () => []).add(f);
       }
 
+      // build ordered sections
       final List<Map<String, dynamic>> newData = [];
 
-      // first add fixed categories
+      // add fixed categories first
       for (final cat in fixedCategoriesOrder) {
         if (grouped.containsKey(cat)) {
           newData.add({"kategori": cat, "items": grouped[cat]!});
@@ -194,16 +211,17 @@ class _MenuPageState extends State<MenuPage> {
         }
       }
 
-      // remaining categories
+      // remaining categories sorted alphabetically
       final remaining = grouped.keys.toList()..sort();
       for (final k in remaining) {
         newData.add({"kategori": k, "items": grouped[k]!});
       }
 
-      // FLATTEN ALL ITEMS
+      // flatten
       final List<Food> flat = [];
       for (final sec in newData) {
-        flat.addAll(sec["items"]);
+        final items = (sec["items"] as List<Food>);
+        flat.addAll(items);
       }
 
       setState(() {
@@ -220,16 +238,21 @@ class _MenuPageState extends State<MenuPage> {
   }
 
   // ===================================================
-  // FILTERING LOGIC
+  // FILTER & SORTing
   // ===================================================
-  List<Food> applyFilter() {
-    List<Food> result = List.from(allItemsFlat);
+  List<Food> applyFilterAndSort(List<Food> source) {
+    List<Food> result = List.from(source);
 
+    // rating_x filters
     if (selectedSortFilter.startsWith("rating_")) {
-      int minRating = int.tryParse(selectedSortFilter.split("_")[1]) ?? 0;
-      result = result.where((m) => m.avgRating >= minRating).toList();
+      final parts = selectedSortFilter.split("_");
+      if (parts.length >= 2) {
+        final minRating = int.tryParse(parts[1]) ?? 0;
+        result = result.where((m) => (m.avgRating.round()) >= minRating).toList();
+      }
     }
 
+    // sort by price
     switch (selectedSortFilter) {
       case "HighToLow":
         result.sort((a, b) => b.price.compareTo(a.price));
@@ -257,24 +280,25 @@ class _MenuPageState extends State<MenuPage> {
           return "Rating $r ke atas";
         }
     }
-    return "";
+    return "Semua Menu";
   }
 
   // ===================================================
-  // CART LOGIC
+  // CART HELPERS
   // ===================================================
   int getQtyFromCart(String id) {
     final cart = Provider.of<CartProvider>(context, listen: false).items;
     final item = cart.firstWhere(
-      (e) => e['id'] == id,
+      (e) => (e['id'] ?? e['_id']) == id,
       orElse: () => {},
     );
-    return item.isNotEmpty ? item['qty'] : 0;
+    if (item == null || item.isEmpty) return 0;
+    return item['qty'] ?? 0;
   }
 
   void addToCart(Food f) {
     Provider.of<CartProvider>(context, listen: false).addItem({
-      "_id": f.id,
+      "id": f.id,
       "name": f.name,
       "description": f.description,
       "price": f.price,
@@ -287,15 +311,20 @@ class _MenuPageState extends State<MenuPage> {
 
   void removeFromCart(Food f) {
     final p = Provider.of<CartProvider>(context, listen: false);
-    final index = p.items.indexWhere((e) => e['id'] == f.id);
+    final index = p.items.indexWhere((e) => (e['id'] ?? e['_id']) == f.id);
     if (index != -1) {
-      p.updateQty(index, p.items[index]['qty'] - 1);
+      final currentQty = p.items[index]['qty'] ?? 0;
+      if (currentQty <= 1) {
+        p.removeItem(index);
+      } else {
+        p.updateQty(index, currentQty - 1);
+      }
       setState(() {});
     }
   }
 
   // ===================================================
-  // MENU CARD
+  // UI helpers
   // ===================================================
   Widget _buildMenuCard(Food f) {
     return MenuCard(
@@ -312,8 +341,7 @@ class _MenuPageState extends State<MenuPage> {
   }
 
   // ===================================================
-  // POPUP FILTER MINI
-  // (tidak diubah — UI kamu tetap)
+  // FILTER POPUP
   // ===================================================
   void _openFilterPopup() {
     showDialog(
@@ -328,7 +356,7 @@ class _MenuPageState extends State<MenuPage> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  width: 260,
+                  width: 300,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -354,7 +382,7 @@ class _MenuPageState extends State<MenuPage> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "Urutkan Berdasarkan",
+                        "Urutkan / Filter",
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -398,14 +426,12 @@ class _MenuPageState extends State<MenuPage> {
                                 Row(
                                   children: List.generate(
                                     star,
-                                    (x) => const Icon(Icons.star,
-                                        color: Colors.orange, size: 18),
+                                    (x) => const Icon(Icons.star, color: Colors.orange, size: 18),
                                   ) +
-                                      List.generate(
-                                        5 - star,
-                                        (x) => const Icon(Icons.star_border,
-                                            color: Colors.grey, size: 18),
-                                      ),
+                                  List.generate(
+                                    5 - star,
+                                    (x) => const Icon(Icons.star_border, color: Colors.grey, size: 18),
+                                  ),
                                 ),
                                 const SizedBox(width: 4),
                                 const Text("ke atas", style: TextStyle(fontSize: 12)),
@@ -453,7 +479,7 @@ class _MenuPageState extends State<MenuPage> {
   Widget _filterOption(String value, String label) {
     return Row(
       children: [
-        Radio(
+        Radio<String>(
           value: value,
           groupValue: selectedSortFilter,
           activeColor: Colors.red,
@@ -468,26 +494,32 @@ class _MenuPageState extends State<MenuPage> {
   }
 
   // ===================================================
-  // BUILD UI
+  // BUILD
   // ===================================================
   @override
   Widget build(BuildContext context) {
     final cartLength = Provider.of<CartProvider>(context).items.length;
-    final query = context.watch<SearchProvider>().query;
+    final query = Provider.of<SearchProvider>(context).query; // already lowercase
 
-    final bool isDefault = selectedSortFilter == "Default";
-final List<Food> filteredItems = applyFilter();
+    // 1) start from flat list
+    List<Food> baseList = List.from(allItemsFlat);
 
-// 🔥 tambahkan filtering SEARCH universal
-final String q = query.toLowerCase();
-List<Food> finalItems = filteredItems.where((f) {
-  if (q.isEmpty) return true;
-  return f.name.toLowerCase().contains(q) ||
-         f.description.toLowerCase().contains(q) ||
-         f.price.toString().contains(q) ||
-         f.category.toLowerCase().contains(q);
-}).toList();
+    // 2) apply search (if any)
+    final q = query.trim();
+    if (q.isNotEmpty) {
+      baseList = baseList.where((f) {
+        final name = f.name.toLowerCase();
+        final desc = f.description.toLowerCase();
+        final cat = f.category.toLowerCase();
+        final priceStr = f.price.toString().toLowerCase();
+        return name.contains(q) || desc.contains(q) || cat.contains(q) || priceStr.contains(q);
+      }).toList();
+    }
 
+    // 3) apply sort/filter rules
+    final List<Food> finalItems = applyFilterAndSort(baseList);
+
+    final bool isDefaultMode = selectedSortFilter == "Default";
 
     return Scaffold(
       body: SafeArea(
@@ -501,8 +533,10 @@ List<Food> finalItems = filteredItems.where((f) {
               Expanded(
                 child: Center(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(errorMessage!),
+                      const SizedBox(height: 8),
                       ElevatedButton(
                         onPressed: _loadMenusFromApi,
                         child: const Text("Coba lagi"),
@@ -516,44 +550,28 @@ List<Food> finalItems = filteredItems.where((f) {
                 child: RefreshIndicator(
                   onRefresh: _loadMenusFromApi,
                   child: ListView(
-                    padding: const EdgeInsets.only(bottom: 100),
+                    padding: const EdgeInsets.only(bottom: 120, top: 8),
                     children: [
-                      // ================================================
-                      // DEFAULT MODE → tampil kategori seperti biasa
-                      // (SEARCH AKTIF DI SINI SAJA)
-                      // ================================================
-                      if (isDefault)
+                      // If Default mode -> show categories (but only items that exist in finalItems)
+                      if (isDefaultMode) ...[
+                        // iterate sections
                         ...semuaMenu.map((section) {
-                          final kategori = section["kategori"];
-                          final items = section["items"] as List<Food>;
+                          final kategori = section["kategori"] as String;
+                          final items = (section["items"] as List<Food>);
 
-                          // Jika ada query, filter di dalam kategori (hanya di mode Default)
-                          final visible = query.isEmpty
-                              ? items
-                              : items.where((f) {
-                                  final q = query.toLowerCase();
-                                  final name = f.name.toLowerCase();
-                                  final desc = f.description.toLowerCase();
-                                  final price = f.price.toString();
-                                  final cat = f.category.toLowerCase();
-                                  return name.contains(q) ||
-                                      desc.contains(q) ||
-                                      price.contains(q) ||
-                                      cat.contains(q);
-                                }).toList();
+                          // Only keep visible items from this section that are also in finalItems
+                          final visible = items.where((f) => finalItems.any((fi) => fi.id == f.id)).toList();
 
-                          if (visible.isEmpty) return const SizedBox();
+                          if (visible.isEmpty) return const SizedBox.shrink();
 
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Header kategori + filter icon (hanya di kategori pertama)
+                              // header
                               Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
                                       kategori,
@@ -563,13 +581,13 @@ List<Food> finalItems = filteredItems.where((f) {
                                         color: Colors.red.shade800,
                                       ),
                                     ),
+                                    // show filter icon on top-right (first section)
                                     if (semuaMenu.first == section)
                                       GestureDetector(
                                         onTap: _openFilterPopup,
                                         child: Row(
                                           children: [
-                                            Icon(Icons.filter_alt,
-                                                color: Colors.red.shade800),
+                                            Icon(Icons.filter_alt, color: Colors.red.shade800),
                                             const SizedBox(width: 6),
                                             Text(
                                               "Filter",
@@ -585,14 +603,13 @@ List<Food> finalItems = filteredItems.where((f) {
                                 ),
                               ),
 
+                              // grid of visible items
                               GridView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: visible.length,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
                                   childAspectRatio: 0.60,
                                   crossAxisSpacing: 12,
@@ -602,17 +619,11 @@ List<Food> finalItems = filteredItems.where((f) {
                               ),
                             ],
                           );
-                        }),
-
-                      // ======================================================
-                      // FILTER MODE → kategori HILANG, jadi SATU LIST BESAR
-                      // (SEARCH TIDAK AKTIF DI SINI — hanya filter & sort)
-                      // ======================================================
-                      if (!isDefault) ...[
-                        // TITLE FILTER
+                        }).toList(),
+                      ] else ...[
+                        // Non-default (filter mode) => show one big grid with finalItems
                         Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -628,8 +639,7 @@ List<Food> finalItems = filteredItems.where((f) {
                                 onTap: _openFilterPopup,
                                 child: Row(
                                   children: [
-                                    Icon(Icons.filter_alt,
-                                        color: Colors.red.shade800),
+                                    Icon(Icons.filter_alt, color: Colors.red.shade800),
                                     const SizedBox(width: 6),
                                     Text(
                                       "Filter",
@@ -644,15 +654,12 @@ List<Food> finalItems = filteredItems.where((f) {
                             ],
                           ),
                         ),
-
-                        // LIST GABUNGAN GRID
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: finalItems.length,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             childAspectRatio: 0.60,
                             crossAxisSpacing: 12,
@@ -661,6 +668,8 @@ List<Food> finalItems = filteredItems.where((f) {
                           itemBuilder: (_, i) => _buildMenuCard(finalItems[i]),
                         ),
                       ],
+
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
