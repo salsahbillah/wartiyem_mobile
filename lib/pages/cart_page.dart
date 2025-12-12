@@ -17,7 +17,7 @@ class _CartPageState extends State<CartPage> {
   int _selectedMethod = -1;
 
   // BASE URL backend kamu
-  final String baseUrl = "https://wartiyem.nabaspace.my.id/";
+  final String baseUrl = "https://kedaiwartiyem.my.id/";
 
   String _methodValueLabel(int v) {
     switch (v) {

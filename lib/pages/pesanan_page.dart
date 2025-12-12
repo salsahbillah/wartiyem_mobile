@@ -8,6 +8,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'struk_page.dart';
+import 'package:provider/provider.dart';
+import '../providers/cart_provider.dart';
+
 
 class PesananPage extends StatefulWidget {
   const PesananPage({super.key});
@@ -27,10 +30,10 @@ class _PesananPageState extends State<PesananPage>
   Map<String, dynamic>? newOrder;
 
   static const String apiBaseUrl =
-      'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/order/user';
+      'https://kedaiwartiyem.my.id/api/order/user';
 
   static const String reviewBaseUrl =
-      'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/reviews';
+      'https://kedaiwartiyem.my.id/api/reviews';
 
   Future<String?> getUserId() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -224,7 +227,7 @@ Future<Map<String, dynamic>?> fetchReviewForOrder(String orderId) async {
     if (token == null) return;
 
     socket = IO.io(
-      "https://unflamboyant-undepreciable-emilia.ngrok-free.dev",
+      "https://kedaiwartiyem.my.id",
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .enableAutoConnect()
@@ -461,8 +464,69 @@ Future<Map<String, dynamic>?> fetchReviewForOrder(String orderId) async {
 }
 
   void beliLagi(Map order) {
-    Navigator.pushNamed(context, "/menu");
+  final cartProvider = Provider.of<CartProvider>(context, listen: false);
+
+  cartProvider.clearCart();
+
+  final items = order["items"] as List<dynamic>? ?? [];
+
+  for (var i in items) {
+    final id = i['productId'] ?? i['product']?['_id'] ?? i['_id'] ?? i['id'];
+    final name = i['productName'] ?? i['name'] ?? i['product']?['name'] ?? '-';
+
+    final priceRaw = i['price'] ?? i['product']?['price'] ?? i['subTotal'] ?? 0;
+    final price = (priceRaw is num) ? priceRaw : double.tryParse('$priceRaw') ?? 0;
+
+    final qtyRaw = i['qty'] ?? i['quantity'] ?? 1;
+    final qty = (qtyRaw is int) ? qtyRaw : int.tryParse('$qtyRaw') ?? 1;
+
+    // ===========================
+// FIX IMAGE (SIMPLE & AKURAT)
+// ===========================
+String img = "";
+
+final product = i['product'] ?? {};
+
+img = product['image'] ??
+      product['img'] ??
+      product['image_url'] ??
+      product['imageUrl'] ??
+      "";
+
+// fallback kalau item punya langsung
+if (img.isEmpty) {
+  img = i['image'] ??
+        i['img'] ??
+        i['image_url'] ??
+        i['imageUrl'] ??
+        "";
+}
+
+// kalau masih kosong, cek array images[]
+if (img.isEmpty && product['images'] is List && product['images'].isNotEmpty) {
+  img = product['images'][0].toString();
+}
+
+if (img.isNotEmpty && !img.startsWith("http")) {
+  img = "https://kedaiwartiyem.my.id/$img";
+}
+
+    final desc = i['description'] ?? i['product']?['description'] ?? '';
+
+    cartProvider.addItem({
+      '_id': id,
+      'id': id,
+      'name': name,
+      'price': price,
+      'qty': qty,
+      'image': img,   // 🎉 FINAL FIX DI SINI
+      'description': desc,
+    });
   }
+
+  Navigator.pushNamed(context, "/cart");
+}
+
 
   @override
   Widget build(BuildContext context) {

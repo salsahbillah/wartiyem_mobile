@@ -4,11 +4,10 @@ import 'package:provider/provider.dart';
 import '../../providers/cart_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import './struk_page.dart';
+import 'struk_page.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../providers/store_provider.dart';
-
+import '/../providers/store_provider.dart';
+import 'midtrans_payment_page.dart'; // <-- pastikan path ini benar (../midtrans_payment_page.dart)
 
 class OrderPage extends StatefulWidget {
   final String? orderMethod;
@@ -30,29 +29,24 @@ class _OrderPageState extends State<OrderPage> {
   bool isLoading = false;
 
   bool _ensureLoggedIn() {
-  final store = Provider.of<StoreProvider>(context, listen: false);
+    final store = Provider.of<StoreProvider>(context, listen: false);
 
-  if (store.token == null ||
-      store.token!.isEmpty ||
-      store.user == null) {
-    showMsg("Silakan login terlebih dahulu");
-    return false;
+    if (store.token == null || store.token!.isEmpty || store.user == null) {
+      showMsg("Silakan login terlebih dahulu");
+      return false;
+    }
+    return true;
   }
-  return true;
-}
 
-
-@override
-void dispose() {
-  nameController.dispose();
-  noteController.dispose();
-  phoneController.dispose();
-  addressController.dispose();
-  tableController.dispose();
-  super.dispose();
-}
-
-
+  @override
+  void dispose() {
+    nameController.dispose();
+    noteController.dispose();
+    phoneController.dispose();
+    addressController.dispose();
+    tableController.dispose();
+    super.dispose();
+  }
 
   // Voucher
   List<Map<String, dynamic>> voucherList = [];
@@ -69,16 +63,11 @@ void dispose() {
   List? argsItems;
   bool _didReadRouteArgs = false;
 
-  // URLs (sesuaikan bila perlu)
-  final String vouchersUrl =
-      'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/vouchers';
-  final String applyVoucherUrl =
-      'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/vouchers/apply';
-  final String createOrderUrl =
-      'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/order';
+  final String vouchersUrl = 'https://kedaiwartiyem.my.id/api/vouchers';
+  final String applyVoucherUrl = 'https://kedaiwartiyem.my.id/api/vouchers/apply';
+  final String createOrderUrl = 'https://kedaiwartiyem.my.id/api/order';
 
-  final NumberFormat _cur =
-      NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+  final NumberFormat _cur = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
   @override
   void initState() {
@@ -116,9 +105,7 @@ void dispose() {
 
       final res = await http.get(
         Uri.parse(vouchersUrl),
-        headers: store.token != null
-            ? {"Authorization": "Bearer ${store.token}"}
-            : null,
+        headers: store.token != null ? {"Authorization": "Bearer ${store.token}"} : null,
       );
       if (res.statusCode != 200) return;
       final data = json.decode(res.body);
@@ -131,13 +118,10 @@ void dispose() {
         } else if (data["data"] is List) parsed = data["data"];
         else parsed = [data];
       }
-      final safeList = parsed
-          .whereType<Map>()
-          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
-          .toList();
+      final safeList = parsed.whereType<Map>().map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
       if (mounted) setState(() => voucherList = safeList);
     } catch (e) {
-      // ignore fetch errors silently (could show msg)
+      // ignore fetch errors silently
     }
   }
 
@@ -152,8 +136,7 @@ void dispose() {
       if (end != null && now.isAfter(end)) return false;
     }
     if (subtotal < _voucherMinOrder(v)) return false;
-    if (v["sisaHariIni"] != null &&
-        v["sisaHariIni"].toString().toLowerCase() != "unlimited") {
+    if (v["sisaHariIni"] != null && v["sisaHariIni"].toString().toLowerCase() != "unlimited") {
       int sisa = int.tryParse(v["sisaHariIni"].toString()) ?? 0;
       if (sisa <= 0) return false;
     }
@@ -214,8 +197,6 @@ void dispose() {
     final store = Provider.of<StoreProvider>(context, listen: false);
     final token = store.token!;
 
-
-
     final voucherId = v["_id"] ?? v["id"] ?? v["voucherId"];
     if (voucherId == null) {
       showMsg("Voucher tidak valid.");
@@ -248,7 +229,6 @@ void dispose() {
         }
         showMsg("Voucher berhasil diterapkan! Diskon: ${_formatMoney(discountAmount)}");
       } else {
-        // coba ambil message dari body bila ada
         String msg = "Gagal menerapkan voucher.";
         try {
           final data = json.decode(res.body);
@@ -266,22 +246,16 @@ void dispose() {
     return "KW-${now.millisecondsSinceEpoch}";
   }
 
-  /// Build payload sesuai backend:
-  /// - items: mengirim field _id, name, quantity, price
-  /// - subtotal, discount, totalAmount, voucherId
   Map<String, dynamic> buildPayload(BuildContext context, double subtotal, double totalAmount) {
     final cart = Provider.of<CartProvider>(context, listen: false);
-final cartItems = argsItems ?? cart.items;
+    final cartItems = argsItems ?? cart.items;
 
-    // map method & payment ke string backend
     String methodBackend = "Makan di Tempat";
     if (orderMethodLocal == "bungkus") methodBackend = "Bungkus";
     if (orderMethodLocal == "diantar") methodBackend = "Diantar";
     String paymentBackend = paymentMethod == "tunai" ? "Tunai" : "Non-Tunai";
 
-    // Prepare items
     final items = cartItems.map((item) {
-      // item might contain different keys; support both
       final idVal = item["_id"] ?? item["id"] ?? item["foodId"];
       final qtyVal = item["qty"] ?? item["quantity"] ?? 1;
       final priceVal = item["price"] is num ? item["price"] : double.tryParse('${item["price"]}') ?? 0;
@@ -295,9 +269,7 @@ final cartItems = argsItems ?? cart.items;
 
     return {
       "name": nameController.text.trim(),
-      "tableNumber": methodBackend == "Makan di Tempat"
-          ? (int.tryParse(tableController.text.trim()))
-          : null,
+      "tableNumber": methodBackend == "Makan di Tempat" ? (int.tryParse(tableController.text.trim())) : null,
       "phone": methodBackend == "Diantar" ? phoneController.text.trim() : null,
       "address": methodBackend == "Diantar" ? addressController.text.trim() : null,
       "note": noteController.text.trim(),
@@ -311,7 +283,6 @@ final cartItems = argsItems ?? cart.items;
       "voucherId": voucherApplied != null ? (voucherApplied!["_id"] ?? voucherApplied!["id"]) : null,
       "voucherType": voucherApplied != null ? voucherTypeText(voucherApplied!) : null,
       "totalAmount": totalAmount,
-      // tambahan lokal (tidak disimpan backend) untuk struk lokal jika perlu
       "localOrderCode": _generateOrderCode(),
     };
   }
@@ -322,8 +293,7 @@ final cartItems = argsItems ?? cart.items;
     if (orderMethodLocal == "makan_di_tempat" && tableController.text.isEmpty) {
       return showMsg("Nomor meja harus diisi");
     }
-    if (orderMethodLocal == "diantar" &&
-        (phoneController.text.isEmpty || addressController.text.isEmpty)) {
+    if (orderMethodLocal == "diantar" && (phoneController.text.isEmpty || addressController.text.isEmpty)) {
       return showMsg("Nomor telepon dan alamat wajib diisi");
     }
     if (paymentMethod.isEmpty) return showMsg("Pilih metode pembayaran terlebih dahulu");
@@ -340,10 +310,8 @@ final cartItems = argsItems ?? cart.items;
     Map<String, dynamic> payload = buildPayload(context, subtotalCalc, total);
 
     try {
-     
-
-    final store = Provider.of<StoreProvider>(context, listen: false);
-    final token = store.token!;
+      final store = Provider.of<StoreProvider>(context, listen: false);
+      final token = store.token!;
 
       final res = await http.post(
         Uri.parse(createOrderUrl),
@@ -359,13 +327,13 @@ final cartItems = argsItems ?? cart.items;
 
       if (res.statusCode == 200 || res.statusCode == 201) {
         if (data["success"] == true) {
-          // clear cart
+          // clear cart locally (you already did in original flow)
           Provider.of<CartProvider>(context, listen: false).clearCart();
 
           final returnedOrder = data["order"] ?? {};
 
           final mergedOrder = {
-            ...Map<String, dynamic>.from(returnedOrder), // FIXED
+            ...Map<String, dynamic>.from(returnedOrder),
             "subtotal": payload["subtotal"],
             "serviceFee": payload["serviceFee"],
             "deliveryFee": payload["deliveryFee"],
@@ -379,13 +347,36 @@ final cartItems = argsItems ?? cart.items;
           // NOTE: ambil redirect_url dari backend
           final redirectUrl = data["redirect_url"];
 
-        // CHECK NON TUNAI
-            if (payload["payment"] == "Non-Tunai" && redirectUrl != null) {
-              final uri = Uri.parse(redirectUrl);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-              }
-            } else {
+          // NON TUNAI → buka WebView Midtrans
+          if (payload["payment"] == "Non-Tunai" && redirectUrl != null) {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MidtransPaymentPage(redirectUrl: redirectUrl),
+              ),
+            );
+
+            // === HANDLE BALIKAN DARI WEBVIEW ===
+            if (result == "open_receipt") {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => StrukPage(order: mergedOrder),
+                ),
+              );
+            }
+
+            if (result == "open_history") {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                "/pesanan",  // halaman riwayat pesanan mobile
+                (route) => false,
+              );
+            }
+
+            return; // STOP supaya tidak lanjut ke tunai
+          }
+          else {
             // pembayaran tunai → langsung ke struk
             Navigator.pushReplacement(
               context,
@@ -398,15 +389,14 @@ final cartItems = argsItems ?? cart.items;
           showMsg(data["message"] ?? "Gagal membuat pesanan");
         }
       } else {
-        // try provide server message
         String err = data["message"] ?? "Gagal membuat pesanan (server error)";
         showMsg(err);
       }
     } catch (e) {
       showMsg("Terjadi kesalahan saat submit");
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
-
-    if (mounted) setState(() => isLoading = false);
   }
 
   void showMsg(String msg) {
@@ -484,16 +474,13 @@ final cartItems = argsItems ?? cart.items;
 
     return StatefulBuilder(
       builder: (context, setStateSB) {
-        final visibleVouchers =
-            showAll ? voucherList : voucherList.take(initialCount).toList();
+        final visibleVouchers = showAll ? voucherList : voucherList.take(initialCount).toList();
 
         return Column(
           children: [
             ...visibleVouchers.map<Widget>((v) {
               bool bisaPakai = isVoucherUsable(v, subtotal);
-              bool isApplied =
-              (voucherApplied?["_id"] ?? voucherApplied?["id"]) ==
-              (v["_id"] ?? v["id"]);
+              bool isApplied = (voucherApplied?["_id"] ?? voucherApplied?["id"]) == (v["_id"] ?? v["id"]);
 
               return Container(
                 width: double.infinity,
@@ -617,20 +604,17 @@ final cartItems = argsItems ?? cart.items;
   Future<void> handlePlaceOrder(double subtotal, List items) async {
     if (!_ensureLoggedIn()) return;
 
-
-  if (paymentMethod.isEmpty) {
-    return showMsg("Pilih metode pembayaran terlebih dahulu");
-  }
-
+    if (paymentMethod.isEmpty) {
+      return showMsg("Pilih metode pembayaran terlebih dahulu");
+    }
 
     if (paymentMethod == "tunai") {
       await submitOrder(subtotal, items);
       return;
     }
 
-    // non tunai -> simulation page
+    // non tunai -> open Midtrans flow
     if (paymentMethod == "non_tunai") {
-      // build a minimal payload to show on MidtransPage
       final cart = Provider.of<CartProvider>(context, listen: false);
       final double subtotalCalc = argsSubtotal ?? cart.subtotal;
       final double serviceFee = (subtotalCalc * 0.10).roundToDouble();
@@ -640,19 +624,9 @@ final cartItems = argsItems ?? cart.items;
 
       final payload = buildPayload(context, subtotalCalc, total);
 
-      final result = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(builder: (_) => MidtransPage(payload: payload)),
-      );
-
-      if (result == true) {
-        setState(() {
-          paymentMethod = "non_tunai";
-        });
-        await submitOrder(subtotal, items);
-      } else {
-        showMsg("Pembayaran non tunai dibatalkan.");
-      }
+      // Instead of simulation page, call submitOrder which will open WebView when backend returns redirect_url
+      setState(() => isLoading = true);
+      await submitOrder(subtotal, items);
       return;
     }
   }
@@ -724,9 +698,7 @@ final cartItems = argsItems ?? cart.items;
             const SizedBox(height: 12),
             ...items.map((item) {
               int qty = (item['qty'] is int) ? item['qty'] : int.tryParse('${item['qty']}') ?? 1;
-              final price = (item['price'] is num)
-                  ? (item['price'] as num).toDouble()
-                  : double.tryParse('${item['price']}') ?? 0;
+              final price = (item['price'] is num) ? (item['price'] as num).toDouble() : double.tryParse('${item['price']}') ?? 0;
 
               return summaryRow("${item['name']} x$qty", _formatMoney(price * qty));
             }),
@@ -740,7 +712,6 @@ final cartItems = argsItems ?? cart.items;
             const Divider(thickness: 1, color: Colors.grey),
             summaryRow("Total", _formatMoney(total), bold: true),
             const SizedBox(height: 30),
-
             const Text("Pilih Metode Pembayaran", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Row(
@@ -788,7 +759,6 @@ final cartItems = argsItems ?? cart.items;
               ],
             ),
             const SizedBox(height: 18),
-
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -804,74 +774,6 @@ final cartItems = argsItems ?? cart.items;
               ),
             ),
             const SizedBox(height: 30),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Halaman simulasi Midtrans (pura-pura)
-class MidtransPage extends StatelessWidget {
-  final Map<String, dynamic> payload;
-  const MidtransPage({super.key, required this.payload});
-
-  @override
-  Widget build(BuildContext context) {
-    final items = payload["items"] as List<dynamic>? ?? [];
-    final total = payload["totalAmount"] ?? 0;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Midtrans (Simulasi)"),
-        backgroundColor: Colors.red,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            const Text("Halaman ini hanya simulasi Midtrans.\nKlik 'Selesaikan Pembayaran' untuk melanjutkan."),
-            const SizedBox(height: 12),
-            Expanded(
-              child: ListView(
-                children: [
-                  ...items.map((it) {
-                    final qty = it['quantity'] ?? it['qty'] ?? 1;
-                    final price = (it['price'] is num) ? it['price'] : double.tryParse('${it['price']}') ?? 0;
-                    return ListTile(
-                      title: Text("${it['name']} x$qty"),
-                      trailing: Text("Rp ${(price * qty).toStringAsFixed(0)}"),
-                    );
-                  }),
-                  const Divider(),
-                  ListTile(
-                    title: const Text("Total"),
-                    trailing: Text("Rp ${total.toStringAsFixed(0)}"),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Return true untuk menandakan pembayaran berhasil di simulasi
-                  Navigator.pop(context, true);
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text("Selesaikan Pembayaran (Simulasi)"),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {
-                  Navigator.pop(context, false);
-                },
-                child: const Text("Batal"),
-              ),
-            ),
           ],
         ),
       ),

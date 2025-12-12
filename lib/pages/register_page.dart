@@ -19,7 +19,7 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => isLoading = true);
 
     const String apiUrl =
-        'https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/user/register';
+        'https://kedaiwartiyem.my.id/api/user/register';
 
     try {
       final response = await http.post(
