@@ -10,6 +10,7 @@ import 'package:wartiyem_mobile/widgets/menu_card.dart';
 import '../providers/cart_provider.dart';
 import '../providers/search_provider.dart';
 import '../services/format.dart';
+import 'dart:async';
 
 // ===================================================
 // MODEL: Food
@@ -157,14 +158,74 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  String selectedCategory = "";
 
+class _HomePageState extends State<HomePage> {
+  // ====== Banner Slider ======
+  late PageController _pageController;
+  int _currentPage = 0;
+
+  // ====== Animasi Text ======
+  double titleScale = 1.0;
+  double subtitleScale = 1.0;
+
+  // ====== Menu / Data ======
+  String selectedCategory = "";
   List<Food> allFoods = [];
   List<Food> recommendedMenus = [];
   List<String> uniqueCategories = [];
   bool isLoading = true;
   String? errorMessage;
+
+List<String> rotatingTexts = [
+  "Telusuri Menu Terbaik Kami",
+  "Nikmati Hidangan Favorit Anda",
+  "Pesan Sekarang, Langsung Antar",
+];
+
+int currentTextIndex = 0;
+
+
+  @override
+
+  void initState() {
+    Timer.periodic(const Duration(seconds: 4), (timer) {
+  setState(() {
+    currentTextIndex = (currentTextIndex + 1) % rotatingTexts.length;
+  });
+});
+
+    super.initState();
+  
+  
+
+    // --- PAGEVIEW SLIDER ---
+    _pageController = PageController(initialPage: 0);
+
+    Future.delayed(Duration.zero, () {
+      Timer.periodic(const Duration(seconds: 3), (timer) {
+        if (!_pageController.hasClients) return;
+
+        _currentPage++;
+        if (_currentPage == 3) _currentPage = 0;
+
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      });
+    });
+
+    // --- LOAD DATA MENU ---
+    _loadMenusFromApi();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
 
   final List<Map<String, String>> kategoriMenu = [
     {"name": "Paket Nasi Liwet", "image": "assets/images/nasii.png"},
@@ -174,11 +235,6 @@ class _HomePageState extends State<HomePage> {
     {"name": "Minuman", "image": "assets/images/teh.png"},
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadMenusFromApi();
-  }
 
   Future<void> _loadMenusFromApi() async {
     setState(() {
@@ -388,42 +444,87 @@ class _HomePageState extends State<HomePage> {
           TopBar(totalCartItems: totalCartItems),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Image.asset(
-                "assets/images/banner.png",
-                height: 140,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SizedBox(
+            height: 160,
+            child: PageView(
+              controller: _pageController,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    'assets/images/banner.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    'assets/images/banner.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    'assets/images/banner.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ],
             ),
           ),
+        ),
+
 
           const SizedBox(height: 16),
 
           Center(
             child: Column(
               children: [
-                Text(
-                  "Telusuri Menu Terbaik Kami",
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: child,
+                  ),
+                  child: Text(
+                    rotatingTexts[currentTextIndex],
+                    key: ValueKey<String>(rotatingTexts[currentTextIndex]),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFE53935), // warna tema Kedai Wartiyem
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
+
                 const SizedBox(height: 8),
-                Text(
-                  "Makan enak itu bukan sekadar mengisi perut, tapi juga cara menikmati hidup.\nSetiap suapan membawa kebahagiaan tersendiri!",
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12.5,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey[800],
-                    height: 1.5,
+                GestureDetector(
+                onTapDown: (_) => setState(() => subtitleScale = 1.05),
+                onTapUp: (_) => setState(() => subtitleScale = 1.0),
+                onTapCancel: () => setState(() => subtitleScale = 1.0),
+                child: AnimatedScale(
+                  scale: subtitleScale,
+                  duration: const Duration(milliseconds: 150),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      "Makan enak itu bukan sekadar mengisi perut, tapi juga cara menikmati hidup. "
+                      "Setiap suapan membawa kebahagiaan tersendiri!",
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12.5,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey[800],
+                        height: 1.5,
+                      ),
+                    ),
                   ),
                 ),
+              ),
+
               ],
             ),
           ),

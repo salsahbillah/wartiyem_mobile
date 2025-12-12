@@ -21,7 +21,7 @@ class _TopBarState extends State<TopBar> {
     super.dispose();
   }
 
-    void handleSearch(BuildContext context) {
+  void handleSearch(BuildContext context) {
     final query = _searchController.text.trim();
 
     if (query.isEmpty) {
@@ -38,27 +38,23 @@ class _TopBarState extends State<TopBar> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
-    // 1. Akses StoreProvider untuk mendapatkan data User
     final user = context.watch<StoreProvider>().user; 
     
-    // 2. Tentukan inisial secara ringkas
-    // Jika user tidak null: 
-    // Coba ambil huruf pertama dari nama. Jika nama kosong, ambil dari email. Jika email kosong, gunakan 'U'.
-    // Jika user null, gunakan 'U' (Default)
     String initial = user != null
-      ? (user.name.isNotEmpty
-          ? user.name[0].toUpperCase()
-          : (user.email.isNotEmpty ? user.email[0].toUpperCase() : ''))
-      : '';
+        ? (user.name.isNotEmpty
+            ? user.name[0].toUpperCase()
+            : (user.email.isNotEmpty ? user.email[0].toUpperCase() : 'U'))
+        : 'U';
 
     return Padding(
       padding: const EdgeInsets.only(top: 50, left: 13, right: 13, bottom: 20),
       child: Row(
         children: [
-          // SEARCH BAR
+          // ==========================
+          // SEARCH BAR (DIREVISI)
+          // ==========================
           Expanded(
             child: TextField(
               controller: _searchController,
@@ -73,15 +69,38 @@ class _TopBarState extends State<TopBar> {
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
                 hintText: "Mau Cari Apa...",
+                hintStyle: const TextStyle(
+                  color: Colors.grey, // 🔥 Placeholder abu abu
+                ),
                 prefixIcon: GestureDetector(
                   onTap: () => handleSearch(context),
-                  child: const Icon(Icons.search, color: Colors.red),
+                  child: const Icon(Icons.search, color: Color.fromARGB(255, 150, 0, 0)),
                 ),
+
+                // 🔥 Border normal
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: const BorderSide(
+                    color: Color.fromARGB(255, 150, 0, 0), // maroon
+                    width: 1.4,
+                  ),
+                ),
+
+                // 🔥 Border saat fokus
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: const BorderSide(
+                    color: Color.fromARGB(255, 150, 0, 0),
+                    width: 2,
+                  ),
+                ),
+
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
               ),
-            ),          ),
+            ),
+          ),
 
           const SizedBox(width: 12),
 
@@ -104,7 +123,7 @@ class _TopBarState extends State<TopBar> {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: const BoxDecoration(
-                      color: Color.fromARGB(255, 155, 10, 0),   // 🔥 WARNA BADGE MERAH
+                      color: Color.fromARGB(255, 155, 10, 0),
                       shape: BoxShape.circle,
                     ),
                     child: Text(
@@ -122,15 +141,14 @@ class _TopBarState extends State<TopBar> {
 
           const SizedBox(width: 12),
 
-          // PROFILE ICON DENGAN INISIAL DINAMIS
+          // PROFILE ICON
           InkWell(
             onTap: () => Navigator.pushNamed(context, '/edit-profile'),
             child: CircleAvatar(
-              // Warna yang lebih sesuai dengan tema yang sudah Anda tetapkan (primaryColor = merah)
-              backgroundColor: const Color.fromARGB(255, 138, 11, 2),   // 🔥 Avatar merah 
+              backgroundColor: const Color.fromARGB(255, 138, 11, 2),
               radius: 18,
               child: Text(
-                initial, 
+                initial,
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
