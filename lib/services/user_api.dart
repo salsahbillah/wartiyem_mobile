@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 // Ganti dengan URL dasar server backend Anda
-const String baseUrl = "https://unflamboyant-undepreciable-emilia.ngrok-free.dev/api/user"; 
+const String baseUrl = "https://kedaiwartiyem.my.id/api/user"; 
 
 // 🎯 KELAS APIRESPONSE DIPINDAH KELUAR (Top-Level Class)
 class ApiResponse {

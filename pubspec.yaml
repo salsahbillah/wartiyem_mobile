@@ -28,8 +28,7 @@ dependencies:
 
   # From branch nbmobile (Naba)
   socket_io_client: ^2.0.3
-
-  webview_flutter: ^4.7.0
+  webview_flutter: ^4.10.0
   bootstrap_icons: ^1.11.1
 
 dev_dependencies:

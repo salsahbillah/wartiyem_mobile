@@ -87,7 +87,7 @@ class Food {
 // API SERVICE
 // ===================================================
 class ApiService {
-  static const String base = 'https://unflamboyant-undepreciable-emilia.ngrok-free.dev';
+  static const String base = 'https://kedaiwartiyem.my.id';
 
   static const String foodsEndpoint = '$base/api/food';
   static const String reviewsTopEndpoint = '$base/api/reviews/top';

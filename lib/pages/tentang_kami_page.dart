@@ -113,18 +113,19 @@ class _TentangKamiPageState extends State<TentangKamiPage> {
                     textAlign: TextAlign.justify,
                   ),
                   const SizedBox(height: 20),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: Image.asset(
-                      'assets/images/w.png',
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+ClipRRect(
+  borderRadius: BorderRadius.circular(12),
+  child: Image.asset(
+    'assets/images/banner.jpg',
+    height: 180,
+    width: double.infinity,
+    fit: BoxFit.cover,
+  ),
+),
+const SizedBox(height: 20),
                 ],
               ),
-            ),
-            const SizedBox(height: 20),
+            ), // <<==== TUTUP PressableCard DI SINI !!
 
             // VISI MISI
             _sectionTitle("Visi & Misi", themeRed),
