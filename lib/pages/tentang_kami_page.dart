@@ -116,7 +116,7 @@ class _TentangKamiPageState extends State<TentangKamiPage> {
 ClipRRect(
   borderRadius: BorderRadius.circular(12),
   child: Image.asset(
-    'assets/images/banner.jpg',
+    'assets/images/logo_kedai.png',
     height: 180,
     width: double.infinity,
     fit: BoxFit.cover,
