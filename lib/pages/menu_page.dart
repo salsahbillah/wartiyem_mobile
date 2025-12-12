@@ -352,7 +352,7 @@ class _MenuPageState extends State<MenuPage> {
           children: [
             Positioned(
               right: 12,
-              top: MediaQuery.of(context).size.height * 0.22,
+              top: MediaQuery.of(context).size.height * 0.10,
               child: Material(
                 color: Colors.transparent,
                 child: Container(

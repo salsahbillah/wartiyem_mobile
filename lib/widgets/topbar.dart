@@ -55,7 +55,7 @@ class _TopBarState extends State<TopBar> {
       : '';
 
     return Padding(
-      padding: const EdgeInsets.only(top: 32, left: 16, right: 16, bottom: 20),
+      padding: const EdgeInsets.only(top: 50, left: 13, right: 13, bottom: 20),
       child: Row(
         children: [
           // SEARCH BAR
@@ -72,7 +72,7 @@ class _TopBarState extends State<TopBar> {
               onSubmitted: (_) => handleSearch(context),
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                hintText: "Apa yang ingin kamu nikmati hari ini?",
+                hintText: "Mau Cari Apa...",
                 prefixIcon: GestureDetector(
                   onTap: () => handleSearch(context),
                   child: const Icon(Icons.search, color: Colors.red),
@@ -103,8 +103,8 @@ class _TopBarState extends State<TopBar> {
                   top: -4,
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor, // Menggunakan PrimaryColor
+                    decoration: const BoxDecoration(
+                      color: Color.fromARGB(255, 155, 10, 0),   // 🔥 WARNA BADGE MERAH
                       shape: BoxShape.circle,
                     ),
                     child: Text(
@@ -127,7 +127,7 @@ class _TopBarState extends State<TopBar> {
             onTap: () => Navigator.pushNamed(context, '/edit-profile'),
             child: CircleAvatar(
               // Warna yang lebih sesuai dengan tema yang sudah Anda tetapkan (primaryColor = merah)
-              backgroundColor: Theme.of(context).primaryColor, 
+              backgroundColor: const Color.fromARGB(255, 138, 11, 2),   // 🔥 Avatar merah 
               radius: 18,
               child: Text(
                 initial, 
