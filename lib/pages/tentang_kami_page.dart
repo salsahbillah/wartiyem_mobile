@@ -34,13 +34,21 @@ class _TentangKamiPageState extends State<TentangKamiPage> {
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: themeRed,
-        title: Text(
-          'Tentang Kami',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        centerTitle: true,
-      ),
+  backgroundColor: themeRed,
+  
+  // HAPUS TOMBOL BACK
+  automaticallyImplyLeading: false,
+
+  title: Text(
+    'Tentang Kami',
+    style: GoogleFonts.poppins(
+      fontWeight: FontWeight.w600,
+      color: Colors.white, // WARNA PUTIH
+    ),
+  ),
+  centerTitle: true,
+),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(14),
         child: Column(

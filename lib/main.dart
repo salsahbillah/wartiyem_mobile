@@ -22,29 +22,20 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        /// -----------------------------------------------------
-        /// 1️⃣ StoreProvider harus paling atas (dependency utama)
-        /// -----------------------------------------------------
+        /// 1️⃣ StoreProvider utama
         ChangeNotifierProvider(create: (_) => StoreProvider()),
 
-        /// -----------------------------------------------------
         /// 2️⃣ CartProvider tergantung StoreProvider
-        /// -----------------------------------------------------
         ChangeNotifierProxyProvider<StoreProvider, CartProvider>(
           create: (_) => CartProvider(),
           update: (_, store, cart) {
             cart ??= CartProvider();
-
-            // Set user ID ke CartProvider setelah login
             cart.setUser(store.user?.id);
-
             return cart;
           },
         ),
 
-        /// -----------------------------------------------------
-        /// 3️⃣ SearchProvider bebas, ga ada dependency
-        /// -----------------------------------------------------
+        /// 3️⃣ SearchProvider bebas
         ChangeNotifierProvider(create: (_) => SearchProvider()),
       ],
       child: const MyApp(),
@@ -73,8 +64,6 @@ class MyApp extends StatelessWidget {
 
         '/login': (context) => LoginPage(
               onLoginSuccess: () {
-                /// Pastikan store sudah update user sebelum masuk MainController
-                /// Ini menghilangkan error provider merah sekilas
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   Navigator.pushReplacement(
                     context,
@@ -99,7 +88,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ============================================================
-// Controller utama setelah login
+//  MAIN CONTROLLER (SETELAH LOGIN)
 // ============================================================
 
 class MainController extends StatefulWidget {
@@ -120,7 +109,7 @@ class _MainControllerState extends State<MainController> {
   @override
   void initState() {
     super.initState();
-    currentTabIndex = widget.startIndex; // ⬅ WAJIB ADA
+    currentTabIndex = widget.startIndex;
   }
 
   void goToTab(int index) {
@@ -136,15 +125,25 @@ class _MainControllerState extends State<MainController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: currentTabIndex,
-        children: const [
-          HomePage(),
-          MenuPage(),
-          PesananPage(),
-          TentangKamiPage(),
-        ],
+      // ================ 🔥 ANIMATED SWITCHER SMOOTH TRANSITION ================
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 350),
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.05, 0),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          );
+        },
+        child: _buildPage(currentTabIndex),
       ),
+
+      // ===================== 🔥 NAVBAR TETAP ======================
       bottomNavigationBar: BottomNavbar(
         selectedIndex: currentTabIndex,
         onItemTapped: (index) {
@@ -156,5 +155,21 @@ class _MainControllerState extends State<MainController> {
         },
       ),
     );
+  }
+
+  // ============== 🔥 PAGE BUILDER WAJIB ADA UNTUK ANIMATION ==============
+  Widget _buildPage(int index) {
+    switch (index) {
+      case 0:
+        return const HomePage(key: ValueKey(0));
+      case 1:
+        return const MenuPage(key: ValueKey(1));
+      case 2:
+        return const PesananPage(key: ValueKey(2));
+      case 3:
+        return const TentangKamiPage(key: ValueKey(3));
+      default:
+        return const HomePage(key: ValueKey(99));
+    }
   }
 }

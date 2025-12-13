@@ -559,9 +559,19 @@ if (img.isNotEmpty && !img.startsWith("http")) {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Riwayat Pesanan"),
+        automaticallyImplyLeading: false, // ⬅️ tombol back DIHAPUS
+        backgroundColor: const Color(0xFF800000),
+        title: const Text(
+          "Riwayat Pesanan",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: true,
+        elevation: 4,
       ),
+
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: orders.length,
@@ -657,16 +667,26 @@ class _OrderCardState extends State<_OrderCard> {
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(_pressed ? 0.18 : 0.06),
-                blurRadius: _pressed ? 20 : 10,
-                offset: const Offset(0, 5),
-              )
-            ],
-          ),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+
+              // BORDER MAROON TIPIS BIAR LEBIH KELIHATAN
+              border: Border.all(
+                color: const Color(0xFF800000), // maroon
+                width: 1.2,
+              ),
+
+              // SHADOW DIBIKIN LEBIH DALAM
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(_pressed ? 0.23 : 0.12),
+                  blurRadius: _pressed ? 26 : 16,
+                  spreadRadius: _pressed ? 2 : 1,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
