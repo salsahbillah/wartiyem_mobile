@@ -466,6 +466,8 @@ Future<Map<String, dynamic>?> fetchReviewForOrder(String orderId) async {
   void beliLagi(Map order) {
   final cartProvider = Provider.of<CartProvider>(context, listen: false);
 
+  cartProvider.clearCart();
+
   final items = order["items"] as List<dynamic>? ?? [];
 
   for (var i in items) {
@@ -581,15 +583,18 @@ if (img.isNotEmpty && !img.startsWith("http")) {
           final tanggal = getDisplayDate(order);
           final rawStatus = (order["status"] ?? "").toString().toLowerCase();
 
+          bool isMenunggu = rawStatus.contains("menunggu");
           bool isSelesai = rawStatus.contains("selesai");
           bool reviewed = order["reviewed"] == true;
 
+
           return _OrderCard(
-            tanggal: tanggal,
+           tanggal: tanggal,
             pesananText: pesananText,
             payment: order["payment"] ?? "",
             method: order["method"] ?? "",
             totalAmount: order["totalAmount"] ?? 0,
+            isMenunggu: isMenunggu,
             isSelesai: isSelesai,
             reviewed: reviewed,
             onTapDetail: () {
@@ -622,6 +627,7 @@ class _OrderCard extends StatefulWidget {
   final String payment;
   final String method;
   final num totalAmount;
+  final bool isMenunggu;
   final bool isSelesai;
   final bool reviewed;
   final VoidCallback onTapDetail;
@@ -634,6 +640,7 @@ class _OrderCard extends StatefulWidget {
     required this.payment,
     required this.method,
     required this.totalAmount,
+    required this.isMenunggu,
     required this.isSelesai,
     required this.reviewed,
     required this.onTapDetail,
@@ -695,22 +702,32 @@ class _OrderCardState extends State<_OrderCard> {
                       style: const TextStyle(
                           fontWeight: FontWeight.w600, fontSize: 13)),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: widget.isSelesai
                           ? Colors.green.withOpacity(0.15)
-                          : Colors.blue.withOpacity(0.15),
+                          : widget.isMenunggu
+                              ? Colors.orange.withOpacity(0.15)
+                              : Colors.blue.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      widget.isSelesai ? "Selesai" : "Diproses",
+                      widget.isSelesai
+                          ? "Selesai"
+                          : widget.isMenunggu
+                              ? "Menunggu"
+                              : "Diproses",
                       style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: widget.isSelesai ? Colors.green : Colors.blue),
+                        fontWeight: FontWeight.bold,
+                        color: widget.isSelesai
+                            ? Colors.green
+                            : widget.isMenunggu
+                                ? Colors.orange
+                                : Colors.blue,
+                      ),
                     ),
-                  )
-                ],
+                  ),
+             ],
               ),
               const SizedBox(height: 12),
               Text("Pesanan: ${widget.pesananText}"),
