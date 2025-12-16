@@ -42,7 +42,7 @@ class _CartPageState extends State<CartPage> {
     }
 
     // Jika relative path
-    return baseUrl + image;
+    return "$baseUrl/images/$image";
   }
 
   @override

@@ -466,8 +466,6 @@ Future<Map<String, dynamic>?> fetchReviewForOrder(String orderId) async {
   void beliLagi(Map order) {
   final cartProvider = Provider.of<CartProvider>(context, listen: false);
 
-  cartProvider.clearCart();
-
   final items = order["items"] as List<dynamic>? ?? [];
 
   for (var i in items) {
