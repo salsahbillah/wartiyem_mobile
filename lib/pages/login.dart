@@ -1,4 +1,3 @@
-// lib/pages/login_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/store_provider.dart';
@@ -16,13 +15,17 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
+  // 👁️ toggle password (UI ONLY)
+  bool obscurePassword = true;
+
+  // ===============================
+  // LOGIKA LOGIN (JANGAN DIUBAH)
+  // ===============================
   Future<void> loginUser() async {
     final storeProvider = context.read<StoreProvider>();
 
-    // Reset error msg
     storeProvider.clearErrorMessage();
 
-    // 🔥 Gunakan fungsi login dari Provider (versi yang benar)
     final success = await storeProvider.login(
       emailController.text,
       passwordController.text,
@@ -39,6 +42,7 @@ class _LoginPageState extends State<LoginPage> {
       );
     }
   }
+  // ===============================
 
   @override
   void dispose() {
@@ -52,97 +56,202 @@ class _LoginPageState extends State<LoginPage> {
     final isLoading = context.watch<StoreProvider>().isLoading;
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Masuk",
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.red,
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            TextField(
-              controller: emailController,
-              decoration: InputDecoration(
-                hintText: "Email",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(4.0),
+      backgroundColor: const Color(0xFFF4F6F8),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
+            children: [
+              // ===== CARD / BOX =====
+              Container(
+                margin: const EdgeInsets.only(top: 140), // ⬅️ ruang utk logo
+                constraints: const BoxConstraints(maxWidth: 380),
+                padding: const EdgeInsets.fromLTRB(24, 80, 24, 24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-            ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      "Login",
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
 
-            const SizedBox(height: 16),
+                    const SizedBox(height: 4),
 
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                hintText: "Password Akun",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(4.0),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-            ),
+                    const Text(
+                      "Silakan masuk untuk melanjutkan",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                    ),
 
-            const SizedBox(height: 24),
+                    const SizedBox(height: 22),
 
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red[800],
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-                onPressed: isLoading ? null : loginUser,
-                child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        "Masuk",
+                    // ===== EMAIL =====
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        "Email",
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: Colors.grey[700],
                         ),
                       ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("Belum Memiliki Akun? "),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pushNamed(context, "/regist");
-                  },
-                  child: const Text(
-                    "Daftar Sekarang",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
                     ),
-                  ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        hintText: "contoh@gmail.com",
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // ===== PASSWORD =====
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        "Password",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: passwordController,
+                      obscureText: obscurePassword,
+                      decoration: InputDecoration(
+                        hintText: "Password akun",
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscurePassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              obscurePassword = !obscurePassword;
+                            });
+                          },
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 22),
+
+                    // ===== BUTTON =====
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : loginUser,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD32F2F),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                "Masuk",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Belum memiliki akun? ",
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pushNamed(context, "/regist");
+                          },
+                          child: const Text(
+                            "Daftar sekarang",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFD32F2F),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            )
-          ],
+              ),
+
+              // ===== LOGO BESAR (TIDAK NGE-DORONG BOX) =====
+              Positioned(
+                top: 0,
+                child: Image.asset(
+                  'assets/images/logo_kedai.png',
+                  width: 300,
+                  height: 300,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
