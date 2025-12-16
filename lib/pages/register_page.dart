@@ -13,9 +13,12 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
 
   bool isLoading = false;
   bool obscurePassword = true;
+  bool obscureConfirmPassword = true;
 
   // ===============================
   // LOGIKA REGISTER (JANGAN DIUBAH)
@@ -61,11 +64,27 @@ class _RegisterPageState extends State<RegisterPage> {
   }
   // ===============================
 
+  // VALIDASI PASSWORD (UI ONLY)
+  void handleRegister() {
+    if (passwordController.text.trim() !=
+        confirmPasswordController.text.trim()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password dan konfirmasi password tidak sama'),
+        ),
+      );
+      return;
+    }
+
+    registerUser();
+  }
+
   @override
   void dispose() {
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
+    confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -80,7 +99,6 @@ class _RegisterPageState extends State<RegisterPage> {
             clipBehavior: Clip.none,
             alignment: Alignment.topCenter,
             children: [
-              // ===== CARD =====
               Container(
                 margin: const EdgeInsets.only(top: 140),
                 constraints: const BoxConstraints(maxWidth: 380),
@@ -107,31 +125,9 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
 
-                    const SizedBox(height: 4),
-
-                    const Text(
-                      "Buat akun baru untuk melanjutkan",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey,
-                      ),
-                    ),
-
                     const SizedBox(height: 22),
 
                     // ===== NAMA =====
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Nama",
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
                     TextField(
                       controller: nameController,
                       decoration: InputDecoration(
@@ -139,8 +135,6 @@ class _RegisterPageState extends State<RegisterPage> {
                         prefixIcon: const Icon(Icons.person_outline),
                         filled: true,
                         fillColor: Colors.grey.shade100,
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
@@ -151,18 +145,6 @@ class _RegisterPageState extends State<RegisterPage> {
                     const SizedBox(height: 14),
 
                     // ===== EMAIL =====
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Email",
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
                     TextField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -171,8 +153,6 @@ class _RegisterPageState extends State<RegisterPage> {
                         prefixIcon: const Icon(Icons.email_outlined),
                         filled: true,
                         fillColor: Colors.grey.shade100,
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
@@ -183,23 +163,11 @@ class _RegisterPageState extends State<RegisterPage> {
                     const SizedBox(height: 14),
 
                     // ===== PASSWORD =====
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Password",
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
                     TextField(
                       controller: passwordController,
                       obscureText: obscurePassword,
                       decoration: InputDecoration(
-                        hintText: "Password akun",
+                        hintText: "Password",
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -215,8 +183,37 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                         filled: true,
                         fillColor: Colors.grey.shade100,
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // ===== KONFIRMASI PASSWORD =====
+                    TextField(
+                      controller: confirmPasswordController,
+                      obscureText: obscureConfirmPassword,
+                      decoration: InputDecoration(
+                        hintText: "Konfirmasi Password",
+                        prefixIcon: const Icon(Icons.lock_reset_outlined),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureConfirmPassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              obscureConfirmPassword =
+                                  !obscureConfirmPassword;
+                            });
+                          },
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
@@ -226,12 +223,12 @@ class _RegisterPageState extends State<RegisterPage> {
 
                     const SizedBox(height: 22),
 
-                    // ===== BUTTON =====
+                    // ===== BUTTON DAFTAR =====
                     SizedBox(
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: isLoading ? null : registerUser,
+                        onPressed: isLoading ? null : handleRegister,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFD32F2F),
                           shape: RoundedRectangleBorder(
@@ -240,13 +237,9 @@ class _RegisterPageState extends State<RegisterPage> {
                           elevation: 0,
                         ),
                         child: isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Colors.white,
-                                ),
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
                               )
                             : const Text(
                                 "Daftar",
@@ -261,11 +254,12 @@ class _RegisterPageState extends State<RegisterPage> {
 
                     const SizedBox(height: 16),
 
+                    // ===== SUDAH PUNYA AKUN =====
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          "Sudah memiliki akun? ",
+                          "Sudah punya akun? ",
                           style: TextStyle(fontSize: 13),
                         ),
                         GestureDetector(
@@ -273,7 +267,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             Navigator.pushReplacementNamed(context, "/login");
                           },
                           child: const Text(
-                            "Masuk",
+                            "Login",
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -287,14 +281,12 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
               ),
 
-              // ===== LOGO BESAR =====
               Positioned(
                 top: 0,
                 child: Image.asset(
                   'assets/images/logo_kedai.png',
                   width: 300,
                   height: 300,
-                  fit: BoxFit.contain,
                 ),
               ),
             ],
