@@ -22,10 +22,8 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        /// 1️⃣ StoreProvider utama
         ChangeNotifierProvider(create: (_) => StoreProvider()),
 
-        /// 2️⃣ CartProvider tergantung StoreProvider
         ChangeNotifierProxyProvider<StoreProvider, CartProvider>(
           create: (_) => CartProvider(),
           update: (_, store, cart) {
@@ -35,7 +33,6 @@ void main() {
           },
         ),
 
-        /// 3️⃣ SearchProvider bebas
         ChangeNotifierProvider(create: (_) => SearchProvider()),
       ],
       child: const MyApp(),
@@ -56,6 +53,8 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.red,
       ),
       initialRoute: '/',
+
+      // ===================== ROUTES NORMAL (TIDAK DIUBAH) =====================
       routes: {
         '/': (context) => LandingPage(
               onLoginSuccess: () =>
@@ -83,21 +82,58 @@ class MyApp extends StatelessWidget {
         '/pesanan': (context) => const PesananPage(),
         '/edit-profile': (context) => EditProfileScreen(),
       },
+
+      // ===================== 🔥 ANIMASI LOGIN ↔ REGISTER (AMAN) =====================
+      onGenerateRoute: (settings) {
+        if (settings.name == '/login' || settings.name == '/regist') {
+          final page = settings.name == '/login'
+              ? LoginPage(
+                  onLoginSuccess: () {
+                    // LOGIKA TETAP DI LOGIN PAGE
+                  },
+                )
+              : const RegisterPage();
+
+          final beginOffset =
+              settings.name == '/login' ? const Offset(-1, 0) : const Offset(1, 0);
+
+          return PageRouteBuilder(
+            settings: settings,
+            transitionDuration: const Duration(milliseconds: 350),
+            pageBuilder: (_, __, ___) => page,
+            transitionsBuilder: (_, animation, __, child) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: beginOffset,
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                  child: child,
+                ),
+              );
+            },
+          );
+        }
+        return null;
+      },
     );
   }
 }
 
 // ============================================================
-//  MAIN CONTROLLER (SETELAH LOGIN)
+//  MAIN CONTROLLER (TETAP)
 // ============================================================
 
 class MainController extends StatefulWidget {
   final int startIndex;
 
-  const MainController({
-    super.key,
-    this.startIndex = 0,
-  });
+  const MainController({super.key, this.startIndex = 0});
 
   @override
   State<MainController> createState() => _MainControllerState();
@@ -125,7 +161,6 @@ class _MainControllerState extends State<MainController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ================ 🔥 ANIMATED SWITCHER SMOOTH TRANSITION ================
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 350),
         transitionBuilder: (child, animation) {
@@ -142,8 +177,6 @@ class _MainControllerState extends State<MainController> {
         },
         child: _buildPage(currentTabIndex),
       ),
-
-      // ===================== 🔥 NAVBAR TETAP ======================
       bottomNavigationBar: BottomNavbar(
         selectedIndex: currentTabIndex,
         onItemTapped: (index) {
@@ -157,7 +190,6 @@ class _MainControllerState extends State<MainController> {
     );
   }
 
-  // ============== 🔥 PAGE BUILDER WAJIB ADA UNTUK ANIMATION ==============
   Widget _buildPage(int index) {
     switch (index) {
       case 0:
@@ -172,5 +204,4 @@ class _MainControllerState extends State<MainController> {
         return const HomePage(key: ValueKey(99));
     }
   }
-
 }
