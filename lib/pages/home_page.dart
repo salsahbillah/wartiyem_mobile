@@ -453,21 +453,21 @@ int currentTextIndex = 0;
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: Image.asset(
-                    'assets/images/banner.png',
+                    'assets/images/banner1.png',
                     fit: BoxFit.cover,
                   ),
                 ),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: Image.asset(
-                    'assets/images/banner.png',
+                    'assets/images/banner2.png',
                     fit: BoxFit.cover,
                   ),
                 ),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: Image.asset(
-                    'assets/images/banner.png',
+                    'assets/images/banner3.png',
                     fit: BoxFit.cover,
                   ),
                 ),

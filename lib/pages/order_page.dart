@@ -284,6 +284,7 @@ class _OrderPageState extends State<OrderPage> {
       "voucherType": voucherApplied != null ? voucherTypeText(voucherApplied!) : null,
       "totalAmount": totalAmount,
       "localOrderCode": _generateOrderCode(),
+      "isMobileApp": true,
     };
   }
 
@@ -327,8 +328,6 @@ class _OrderPageState extends State<OrderPage> {
 
       if (res.statusCode == 200 || res.statusCode == 201) {
         if (data["success"] == true) {
-          // clear cart locally (you already did in original flow)
-          Provider.of<CartProvider>(context, listen: false).clearCart();
 
           final returnedOrder = data["order"] ?? {};
 
@@ -356,8 +355,11 @@ class _OrderPageState extends State<OrderPage> {
               ),
             );
 
-            // === HANDLE BALIKAN DARI WEBVIEW ===
+            final cartProvider = Provider.of<CartProvider>(context, listen: false);
+
             if (result == "open_receipt") {
+              cartProvider.clearCart();
+
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -367,24 +369,27 @@ class _OrderPageState extends State<OrderPage> {
             }
 
             if (result == "open_history") {
+              cartProvider.clearCart();
+
               Navigator.pushNamedAndRemoveUntil(
                 context,
-                "/pesanan",  // halaman riwayat pesanan mobile
+                "/pesanan",
                 (route) => false,
               );
             }
 
-            return; // STOP supaya tidak lanjut ke tunai
+            return;
           }
           else {
-            // pembayaran tunai → langsung ke struk
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => StrukPage(order: mergedOrder),
-              ),
-            );
-          }
+  Provider.of<CartProvider>(context, listen: false).clearCart();
+
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => StrukPage(order: mergedOrder),
+    ),
+  );
+}
         } else {
           showMsg(data["message"] ?? "Gagal membuat pesanan");
         }
@@ -601,35 +606,16 @@ class _OrderPageState extends State<OrderPage> {
   }
 
   // Handle place order (tunai vs non_tunai)
-  Future<void> handlePlaceOrder(double subtotal, List items) async {
-    if (!_ensureLoggedIn()) return;
+  // Handle place order (SEMUA lewat submitOrder)
+Future<void> handlePlaceOrder(double subtotal, List items) async {
+  if (!_ensureLoggedIn()) return;
 
-    if (paymentMethod.isEmpty) {
-      return showMsg("Pilih metode pembayaran terlebih dahulu");
-    }
-
-    if (paymentMethod == "tunai") {
-      await submitOrder(subtotal, items);
-      return;
-    }
-
-    // non tunai -> open Midtrans flow
-    if (paymentMethod == "non_tunai") {
-      final cart = Provider.of<CartProvider>(context, listen: false);
-      final double subtotalCalc = argsSubtotal ?? cart.subtotal;
-      final double serviceFee = (subtotalCalc * 0.10).roundToDouble();
-      final double deliveryFee = (orderMethodLocal == "diantar") ? 10000.0 : 0.0;
-      double total = subtotalCalc + serviceFee + deliveryFee - discountAmount;
-      if (total < 0) total = 0;
-
-      final payload = buildPayload(context, subtotalCalc, total);
-
-      // Instead of simulation page, call submitOrder which will open WebView when backend returns redirect_url
-      setState(() => isLoading = true);
-      await submitOrder(subtotal, items);
-      return;
-    }
+  if (paymentMethod.isEmpty) {
+    return showMsg("Pilih metode pembayaran terlebih dahulu");
   }
+
+  await submitOrder(subtotal, items);
+}
 
   @override
   Widget build(BuildContext context) {

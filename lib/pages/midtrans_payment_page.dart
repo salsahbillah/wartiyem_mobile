@@ -11,7 +11,8 @@ class MidtransPaymentPage extends StatefulWidget {
 }
 
 class _MidtransPaymentPageState extends State<MidtransPaymentPage> {
-  late WebViewController controller;
+  late final WebViewController controller;
+  bool _alreadyReturned = false;
 
   @override
   void initState() {
@@ -21,39 +22,27 @@ class _MidtransPaymentPageState extends State<MidtransPaymentPage> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onUrlChange: (change) {
-            if (change.url == null) return;
-            final url = change.url!;
-
-            print("URL CHANGE => $url");
-
-            // jika web Midtrans / halaman hasil redirect menampilkan tombol struk
-            if (url.contains("redirect_struk") ||
-                url.contains("/order/receipt") ||
-                url.contains("lihat-struk")) {
-              Navigator.pop(context, "open_receipt");
-            }
-
-            if (url.contains("redirect_history") ||
-                url.contains("/order/history") ||
-                url.contains("riwayat")) {
-              Navigator.pop(context, "open_history");
-            }
-          },
           onNavigationRequest: (request) {
             final url = request.url;
-            print("NAV REQ => $url");
+            debugPrint("NAV => $url");
 
-            if (url.contains("/order/receipt") ||
-                url.contains("lihat-struk")) {
-              Navigator.pop(context, "open_receipt");
-              return NavigationDecision.prevent;
-            }
+            // ✅ DEEP LINK DARI MIDTRANS (MOBILE)
+            if (url.startsWith("kedaiwartiyem://")) {
+              if (_alreadyReturned) {
+                return NavigationDecision.prevent;
+              }
+              _alreadyReturned = true;
 
-            if (url.contains("/order/history") ||
-                url.contains("riwayat")) {
-              Navigator.pop(context, "open_history");
-              return NavigationDecision.prevent;
+              if (url.contains("/payment/finish")) {
+                Navigator.pop(context, "open_receipt");
+                return NavigationDecision.prevent;
+              }
+
+              if (url.contains("/payment/unfinish") ||
+                  url.contains("/payment/error")) {
+                Navigator.pop(context, "open_history");
+                return NavigationDecision.prevent;
+              }
             }
 
             return NavigationDecision.navigate;
@@ -63,11 +52,38 @@ class _MidtransPaymentPageState extends State<MidtransPaymentPage> {
       ..loadRequest(Uri.parse(widget.redirectUrl));
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Pembayaran")),
-      body: WebViewWidget(controller: controller),
-    );
+  bool _isReceiptUrl(String url) {
+    return url.contains("redirect_struk") ||
+        url.contains("/order/receipt") ||
+        url.contains("lihat-struk");
   }
+
+  bool _isHistoryUrl(String url) {
+    return url.contains("redirect_history") ||
+        url.contains("/order/history") ||
+        url.contains("riwayat");
+  }
+
+  @override
+Widget build(BuildContext context) {
+  return PopScope(
+    canPop: false,
+    onPopInvoked: (didPop) {
+      if (didPop) return;
+      Navigator.pop(context, "open_history");
+    },
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text("Pembayaran"),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () {
+            Navigator.pop(context, "open_history");
+          },
+        ),
+      ),
+      body: WebViewWidget(controller: controller),
+    ),
+  );
+}
 }
