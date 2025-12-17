@@ -160,6 +160,7 @@ class HomePage extends StatefulWidget {
 
 
 class _HomePageState extends State<HomePage> {
+  
   // ====== Banner Slider ======
   late PageController _pageController;
   int _currentPage = 0;
@@ -618,16 +619,20 @@ int currentTextIndex = 0;
           const SizedBox(height: 20),
 
           // HEADER
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              showingSearch ? "Hasil Pencarian" : "Menu Rekomendasi",
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                showingSearch
+                    ? "Hasil Pencarian"
+                    : selectedCategory.isNotEmpty
+                        ? selectedCategory
+                        : "Menu Rekomendasi",
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          ),
 
           const SizedBox(height: 12),
 

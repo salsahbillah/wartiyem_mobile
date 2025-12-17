@@ -17,26 +17,30 @@ import 'pages/cart_page.dart';
 import 'pages/order_page.dart';
 import 'pages/struk_page.dart';
 import 'widgets/navbar.dart';
+import 'providers/notification_provider.dart';
 
 void main() {
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => StoreProvider()),
+  providers: [
+    ChangeNotifierProvider(create: (_) => StoreProvider()),
 
-        ChangeNotifierProxyProvider<StoreProvider, CartProvider>(
-          create: (_) => CartProvider(),
-          update: (_, store, cart) {
-            cart ??= CartProvider();
-            cart.setUser(store.user?.id);
-            return cart;
-          },
-        ),
-
-        ChangeNotifierProvider(create: (_) => SearchProvider()),
-      ],
-      child: const MyApp(),
+    ChangeNotifierProxyProvider<StoreProvider, CartProvider>(
+      create: (_) => CartProvider(),
+      update: (_, store, cart) {
+        cart ??= CartProvider();
+        cart.setUser(store.user?.id);
+        return cart;
+      },
     ),
+
+    ChangeNotifierProvider(create: (_) => SearchProvider()),
+
+    // 🔔 TAMBAHAN NOTIF
+    ChangeNotifierProvider(create: (_) => NotificationProvider()),
+  ],
+  child: const MyApp(),
+),
   );
 }
 
