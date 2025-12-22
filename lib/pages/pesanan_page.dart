@@ -11,6 +11,13 @@ import 'struk_page.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 
+enum OrderFinalStatus {
+  menungguPembayaran,
+  menungguKonfirmasi,
+  diproses,
+  selesai,
+  dibatalkan,
+}
 
 class PesananPage extends StatefulWidget {
   const PesananPage({super.key});
@@ -69,6 +76,68 @@ class _PesananPageState extends State<PesananPage>
     super.dispose();
   }
 
+OrderFinalStatus getFinalStatus(Map order) {
+  final payment = (order["payment"] ?? "").toString();
+  final status = (order["status"] ?? "").toString().toLowerCase();
+  final paymentStatus =
+      (order["paymentStatus"] ?? "").toString().toLowerCase();
+
+  // ❌ DIBATALKAN
+  if (status.contains("dibatalkan") ||
+      ["cancel", "expire", "deny"].contains(paymentStatus)) {
+    return OrderFinalStatus.dibatalkan;
+  }
+
+  // 🟡 NON TUNAI BELUM BAYAR
+  if (payment == "Non-Tunai" && paymentStatus == "pending") {
+    return OrderFinalStatus.menungguPembayaran;
+  }
+
+  // 🟠 SUDAH BAYAR / TUNAI
+  if (status.contains("menunggu")) {
+    return OrderFinalStatus.menungguKonfirmasi;
+  }
+
+  if (status.contains("diproses")) {
+    return OrderFinalStatus.diproses;
+  }
+
+  if (status.contains("selesai")) {
+    return OrderFinalStatus.selesai;
+  }
+
+  return OrderFinalStatus.menungguKonfirmasi;
+}
+
+Future<void> bayarSekarang(String orderId) async {
+  try {
+    final token = await getToken();
+
+    final res = await http.post(
+      Uri.parse(
+        "https://kedaiwartiyem.my.id/api/order/retry-payment/$orderId",
+      ),
+      headers: {
+        if (token != null) "Authorization": "Bearer $token",
+      },
+    );
+
+    final data = jsonDecode(res.body);
+
+    if (data["redirect_url"] != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Membuka pembayaran...")),
+      );
+      // nanti bisa kamu ganti webview
+    } else {
+      throw Exception("Gagal memulai pembayaran");
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Gagal bayar: $e")),
+    );
+  }
+}
 
   // Fungsi bantu untuk mem-fetch review sebuah order (mengembalikan Map review atau null)
 // Replace existing fetchReviewForOrder with this
@@ -581,10 +650,7 @@ if (img.isNotEmpty && !img.startsWith("http")) {
           final items = order["items"] as List<dynamic>? ?? [];
           final pesananText = items.map((it) => it["name"]).join(", ");
           final tanggal = getDisplayDate(order);
-          final rawStatus = (order["status"] ?? "").toString().toLowerCase();
-
-          bool isMenunggu = rawStatus.contains("menunggu");
-          bool isSelesai = rawStatus.contains("selesai");
+          final finalStatus = getFinalStatus(order);
           bool reviewed = order["reviewed"] == true;
 
 
@@ -594,8 +660,8 @@ if (img.isNotEmpty && !img.startsWith("http")) {
             payment: order["payment"] ?? "",
             method: order["method"] ?? "",
             totalAmount: order["totalAmount"] ?? 0,
-            isMenunggu: isMenunggu,
-            isSelesai: isSelesai,
+            finalStatus: finalStatus,
+            onBayarSekarang: () => bayarSekarang(order["_id"]),
             reviewed: reviewed,
             onTapDetail: () {
               Navigator.push(
@@ -627,8 +693,8 @@ class _OrderCard extends StatefulWidget {
   final String payment;
   final String method;
   final num totalAmount;
-  final bool isMenunggu;
-  final bool isSelesai;
+  final OrderFinalStatus finalStatus;
+  final VoidCallback onBayarSekarang;
   final bool reviewed;
   final VoidCallback onTapDetail;
   final VoidCallback onBeliLagi;
@@ -640,8 +706,8 @@ class _OrderCard extends StatefulWidget {
     required this.payment,
     required this.method,
     required this.totalAmount,
-    required this.isMenunggu,
-    required this.isSelesai,
+    required this.finalStatus,
+    required this.onBayarSekarang,
     required this.reviewed,
     required this.onTapDetail,
     required this.onBeliLagi,
@@ -657,9 +723,48 @@ class _OrderCardState extends State<_OrderCard> {
 
   @override
   Widget build(BuildContext context) {
-    final enableBeli = widget.isSelesai;
-    final enableRating = widget.isSelesai;
-    
+    // =============================
+    // STATUS FLAG
+    // =============================
+    final isMenungguBayar =
+        widget.finalStatus == OrderFinalStatus.menungguPembayaran;
+    final isMenunggu =
+        widget.finalStatus == OrderFinalStatus.menungguKonfirmasi;
+    final isDiproses =
+        widget.finalStatus == OrderFinalStatus.diproses;
+    final isSelesai =
+        widget.finalStatus == OrderFinalStatus.selesai;
+    final isDibatalkan =
+        widget.finalStatus == OrderFinalStatus.dibatalkan;
+
+    // =============================
+    // LABEL & COLOR STATUS (INI YG KAMU TANYA)
+    // =============================
+    String label;
+    Color color;
+
+    switch (widget.finalStatus) {
+      case OrderFinalStatus.menungguPembayaran:
+        label = "Menunggu Pembayaran";
+        color = Colors.red;
+        break;
+      case OrderFinalStatus.menungguKonfirmasi:
+        label = "Menunggu Konfirmasi";
+        color = Colors.orange;
+        break;
+      case OrderFinalStatus.diproses:
+        label = "Diproses";
+        color = Colors.blue;
+        break;
+      case OrderFinalStatus.selesai:
+        label = "Selesai";
+        color = Colors.green;
+        break;
+      case OrderFinalStatus.dibatalkan:
+        label = "Dibatalkan";
+        color = Colors.grey;
+        break;
+    }
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
@@ -672,121 +777,165 @@ class _OrderCardState extends State<_OrderCard> {
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-
-              // BORDER MAROON TIPIS BIAR LEBIH KELIHATAN
-              border: Border.all(
-                color: const Color(0xFF800000), // maroon
-                width: 1.2,
-              ),
-
-              // SHADOW DIBIKIN LEBIH DALAM
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(_pressed ? 0.23 : 0.12),
-                  blurRadius: _pressed ? 26 : 16,
-                  spreadRadius: _pressed ? 2 : 1,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFF800000),
+              width: 1.2,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(_pressed ? 0.23 : 0.12),
+                blurRadius: _pressed ? 26 : 16,
+                spreadRadius: _pressed ? 2 : 1,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
 
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // =============================
+              // HEADER
+              // =============================
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(widget.tanggal,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 13)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: widget.isSelesai
-                          ? Colors.green.withOpacity(0.15)
-                          : widget.isMenunggu
-                              ? Colors.orange.withOpacity(0.15)
-                              : Colors.blue.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      widget.isSelesai
-                          ? "Selesai"
-                          : widget.isMenunggu
-                              ? "Menunggu"
-                              : "Diproses",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: widget.isSelesai
-                            ? Colors.green
-                            : widget.isMenunggu
-                                ? Colors.orange
-                                : Colors.blue,
+                  children: [
+                    // ⬅️ TANGGAL (KIRI)
+                    Expanded(
+                      child: Text(
+                        widget.tanggal,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
-                  ),
-             ],
-              ),
+
+                    // ⬅️ STATUS (KANAN)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               const SizedBox(height: 12),
-              Text("Pesanan: ${widget.pesananText}"),
+              Text(
+                "Pesanan: ${widget.pesananText}",
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
               const SizedBox(height: 4),
               Text("Pembayaran: ${widget.payment} | Layanan: ${widget.method}"),
               const SizedBox(height: 12),
               Text(
-                "Total: Rp ${widget.totalAmount.toString().replaceAllMapped(RegExp(r'\\B(?=(\\d{3})+(?!\\d))'), (m) => '.')}",
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-              const SizedBox(height: 10),
-              GestureDetector(
-                onTap: widget.onTapDetail,
-                child: const Text(
-                  "Lihat Detail",
-                  style: TextStyle(
-                      color: Color(0xFF2ECC71),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14),
+                "Total: Rp ${widget.totalAmount.toString().replaceAllMapped(
+                  RegExp(r'\\B(?=(\\d{3})+(?!\\d))'),
+                  (m) => '.',
+                )}",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: enableBeli ? widget.onBeliLagi : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            enableBeli ? const Color(0xFFE74C3C) : Colors.grey,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: const Text("Beli Lagi",
-                          style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: enableRating ? widget.onBeriRating : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: enableRating
-                            ? const Color(0xFFF5A623)
-                            : Colors.grey,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: Text(
-                        widget.reviewed ? "Lihat Rating" : "Beri Rating",
-                        style: const TextStyle(color: Colors.white),
+
+              const SizedBox(height: 12),
+
+              // =============================
+              // ACTION BUTTON (INI YG KEDUA)
+              // =============================
+              if (isMenungguBayar) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: widget.onBayarSekarang,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
+                    child: const Text(
+                      "Bayar Sekarang",
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
-                ],
-              )
+                ),
+              ]
+
+              else if (isMenunggu || isDiproses) ...[
+                GestureDetector(
+                  onTap: widget.onTapDetail,
+                  child: const Text(
+                    "Lihat Detail",
+                    style: TextStyle(
+                      color: Color(0xFF2ECC71),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ]
+
+              else if (isSelesai) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: widget.onBeliLagi,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE74C3C),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text(
+                          "Beli Lagi",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: widget.onBeriRating,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF5A623),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: Text(
+                          widget.reviewed
+                              ? "Lihat Rating"
+                              : "Beri Rating",
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ]
+
+              else if (isDibatalkan) ...[
+                const Text(
+                  "Pembayaran dibatalkan. Silakan pesan ulang.",
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
