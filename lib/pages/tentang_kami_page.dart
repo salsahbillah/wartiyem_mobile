@@ -1,5 +1,6 @@
 
 // lib/pages/tentang_kami_page.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,8 +13,47 @@ class TentangKamiPage extends StatefulWidget {
 }
 
 class _TentangKamiPageState extends State<TentangKamiPage> {
+  
   static const Color themeRed = Color(0xFF7A1F1F);
   static const Color bg = Color(0xFFF6F6F6);
+
+  final ScrollController _scrollController = ScrollController();
+
+  late PageController _headerController;
+  int _currentHeader = 0;
+  Timer? _headerTimer;
+
+  
+
+  final List<Map<String, dynamic>> headerSlides = [
+    {
+      "title": "Kedai Wartiyem",
+      "subtitle": "Rasa Tradisional • Sentuhan Digital",
+      "gradient": const LinearGradient(
+        colors: [Color(0xFF7A1F1F), Color(0xFFF3E5D8)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    },
+    {
+      "title": "Masakan Rumahan",
+      "subtitle": "Hangat • Autentik • Penuh Cinta",
+      "gradient": const LinearGradient(
+        colors: [Color(0xFFFBC02D), Color(0xFFFFF9C4)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    },
+    {
+      "title": "Lebih Mudah & Cepat",
+      "subtitle": "Pesan Sekarang • Kami Antar",
+      "gradient": const LinearGradient(
+        colors: [Color(0xFF212121), Color(0xFF616161)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    },
+  ];
 
   String get _wa => '6285943622000';
   String get _waUrl =>
@@ -29,8 +69,39 @@ class _TentangKamiPageState extends State<TentangKamiPage> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+    @override
+  void initState() {
+    super.initState();
+
+    _headerController = PageController();
+
+    _headerTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (!_headerController.hasClients) return;
+
+      _currentHeader =
+          (_currentHeader + 1) % headerSlides.length;
+
+      _headerController.animateToPage(
+        _currentHeader,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+
+  @override
+void dispose() {
+  _headerTimer?.cancel();
+  _headerController.dispose();
+  _scrollController.dispose();
+  super.dispose();
+}
+
+
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
@@ -50,59 +121,74 @@ class _TentangKamiPageState extends State<TentangKamiPage> {
 ),
 
       body: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // =========================
-            // HEADER (Style C Energetic)
+            // HEADER CARAUSEL
             // =========================
-            PressableHeader(
-              themeRed: themeRed,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: themeRed,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: themeRed.withOpacity(.35),
-                      blurRadius: 22,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 6),
-                    )
-                  ],
+           SizedBox(
+                    height: 150,
+                    child: PageView.builder(
+                      controller: _headerController,
+                      itemCount: headerSlides.length,
+                      itemBuilder: (context, i) {
+                        final slide = headerSlides[i];
+
+                      return PressableHeader(
+                        themeRed: themeRed,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: slide["gradient"],
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(.25),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              )
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                slide["title"],
+                                style: GoogleFonts.poppins(
+                                  fontSize: 26,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                slide["subtitle"],
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.white.withOpacity(.95),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Kedai Wartiyem',
-                      style: GoogleFonts.poppins(
-                        fontSize: 28,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Rasa Tradisional, Sentuhan Digital',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(.90),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
+                const SizedBox(height: 20),
+
 
             // KISAH KAMI
             _sectionTitle("Kisah Kami", themeRed),
             const SizedBox(height: 8),
-            PressableCard(
+            AnimatedOnScroll(
+            controller: _scrollController,
+            child: PressableCard(
               themeRed: themeRed,
               child: Column(
                 children: [
@@ -134,68 +220,86 @@ const SizedBox(height: 20),
                 ],
               ),
             ), // <<==== TUTUP PressableCard DI SINI !!
-
+            ),
             // VISI MISI
-            _sectionTitle("Visi & Misi", themeRed),
-            const SizedBox(height: 8),
-            PressableSubCard(
-              themeRed: themeRed,
-              title: "Visi",
-              text:
-                  "Menjadi rumah makan pilihan utama yang menggabungkan rasa autentik "
-                  "dengan pelayanan berbasis teknologi modern.",
-            ),
-            const SizedBox(height: 12),
-            PressableSubCard(
-              themeRed: themeRed,
-              title: "Misi",
-              text:
-                  "- Menyediakan makanan berkualitas dengan harga terjangkau\n"
-                  "- Mengutamakan kepuasan pelanggan melalui layanan cepat dan tepat\n"
-                  "- Terus berinovasi dalam pelayanan dan teknologi",
-            ),
+            AnimatedOnScroll(
+  controller: _scrollController,
+  child: _sectionTitle("Visi & Misi", themeRed),
+),
+const SizedBox(height: 8),
+
+AnimatedOnScroll(
+  controller: _scrollController,
+  child: PressableSubCard(
+    themeRed: themeRed,
+    title: "Visi",
+    text:
+        "Menjadi rumah makan pilihan utama yang menggabungkan rasa autentik "
+        "dengan pelayanan berbasis teknologi modern.",
+  ),
+),
+
+const SizedBox(height: 12),
+
+AnimatedOnScroll(
+  controller: _scrollController,
+  child: PressableSubCard(
+    themeRed: themeRed,
+    title: "Misi",
+    text:
+        "- Menyediakan makanan berkualitas dengan harga terjangkau\n"
+        "- Mengutamakan kepuasan pelanggan\n"
+        "- Terus berinovasi dalam pelayanan",
+  ),
+),
+
             const SizedBox(height: 20),
 
             // HUBUNGI KAMI
             _sectionTitle("Hubungi Kami", themeRed),
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                UpgradedContactIcon(
-                  icon: Icons.chat_bubble_rounded,
-                  label: 'WhatsApp',
-                  activeColor: const Color(0xFF25D366),
-                  onTap: () => _open(_waUrl),
-                  themeRed: themeRed,
-                ),
-                const SizedBox(width: 16),
-                UpgradedContactIcon(
-                  icon: Icons.facebook_rounded,
-                  label: 'Facebook',
-                  activeColor: const Color(0xFF1877F2),
-                  onTap: () => _open(_fbUrl),
-                  themeRed: themeRed,
-                ),
-                const SizedBox(width: 16),
-                UpgradedContactIcon(
-                  icon: Icons.camera_alt_rounded,
-                  label: 'Instagram',
-                  activeColor: const Color(0xFFC13584),
-                  onTap: () => _open(_igUrl),
-                  themeRed: themeRed,
-                ),
-                const SizedBox(width: 16),
-                UpgradedContactIcon(
-                  icon: Icons.location_on_rounded,
-                  label: 'Maps',
-                  activeColor: themeRed,
-                  onTap: () => _open(_mapsUrl),
-                  themeRed: themeRed,
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+            AnimatedOnScroll(
+  controller: _scrollController,
+  child: Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      UpgradedContactIcon(
+        icon: Icons.chat_bubble_rounded,
+        label: 'WhatsApp',
+        activeColor: const Color(0xFF25D366),
+        onTap: () => _open(_waUrl),
+        themeRed: themeRed,
+      ),
+      const SizedBox(width: 16),
+      UpgradedContactIcon(
+        icon: Icons.facebook_rounded,
+        label: 'Facebook',
+        activeColor: const Color(0xFF1877F2),
+        onTap: () => _open(_fbUrl),
+        themeRed: themeRed,
+      ),
+      const SizedBox(width: 16),
+      UpgradedContactIcon(
+        icon: Icons.camera_alt_rounded,
+        label: 'Instagram',
+        activeColor: const Color(0xFFC13584),
+        onTap: () => _open(_igUrl),
+        themeRed: themeRed,
+      ),
+      const SizedBox(width: 16),
+      UpgradedContactIcon(
+        icon: Icons.location_on_rounded,
+        label: 'Maps',
+        activeColor: themeRed,
+        onTap: () => _open(_mapsUrl),
+        themeRed: themeRed,
+      ),
+    ],
+  ),
+),
+
+const SizedBox(height: 24),
+
 
             // KEUNGGULAN
             _sectionTitle("Kenapa Harus Pilih Kami?", themeRed),
@@ -283,6 +387,7 @@ const SizedBox(height: 20),
             ),
             const SizedBox(height: 40),
           ],
+
         ),
       ),
     );
@@ -587,12 +692,15 @@ class _UpgradedContactIconState extends State<UpgradedContactIcon> with SingleTi
   late final AnimationController _ctrl;
   late final Animation<double> _scaleAnim;
 
+  
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 180));
     _scaleAnim = Tween<double>(begin: 1.0, end: 1.08).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
   }
+
+  
 
   @override
   void dispose() {
@@ -618,6 +726,7 @@ class _UpgradedContactIconState extends State<UpgradedContactIcon> with SingleTi
 
   @override
   Widget build(BuildContext context) {
+    
     final boxShadow = _pressed
         ? [
             BoxShadow(
@@ -713,9 +822,9 @@ class _PressableTeamCardState extends State<PressableTeamCard> with SingleTicker
 
   @override
   void dispose() {
-    _ctrl.dispose();
     super.dispose();
   }
+
 
   void _onTapDown(TapDownDetails _) {
     setState(() => _pressed = true);
@@ -794,6 +903,68 @@ class _PressableTeamCardState extends State<PressableTeamCard> with SingleTicker
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class AnimatedOnScroll extends StatefulWidget {
+  final Widget child;
+  final ScrollController controller;
+
+  const AnimatedOnScroll({
+    super.key,
+    required this.child,
+    required this.controller,
+  });
+
+  @override
+  State<AnimatedOnScroll> createState() => _AnimatedOnScrollState();
+}
+
+class _AnimatedOnScrollState extends State<AnimatedOnScroll> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_check);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+  }
+
+  void _check() {
+    if (!mounted) return;
+
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+
+    final pos = box.localToGlobal(Offset.zero);
+    final screenH = MediaQuery.of(context).size.height;
+
+    final shouldShow =
+        pos.dy < screenH * 0.85 && pos.dy > -box.size.height;
+
+    if (shouldShow != _visible) {
+      setState(() => _visible = shouldShow);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_check);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 400),
+      opacity: _visible ? 1 : 0,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+        offset: _visible ? Offset.zero : const Offset(0, 0.25),
+        child: widget.child,
       ),
     );
   }

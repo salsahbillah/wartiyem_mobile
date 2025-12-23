@@ -129,7 +129,11 @@ class MenuPage extends StatefulWidget {
   State<MenuPage> createState() => _MenuPageState();
 }
 
+
 class _MenuPageState extends State<MenuPage> {
+
+  final ScrollController _scrollController = ScrollController();
+
   List<Map<String, dynamic>> semuaMenu = []; // sections: {kategori, items}
   List<Food> allItemsFlat = []; // flattened items
   bool isLoading = true;
@@ -154,6 +158,11 @@ class _MenuPageState extends State<MenuPage> {
     _loadMenusFromApi();
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
   // If navigated with arguments (e.g. TopBar -> /menu with {"search": query}),
   // ensure SearchProvider is updated once.
   @override
@@ -550,6 +559,7 @@ class _MenuPageState extends State<MenuPage> {
                 child: RefreshIndicator(
                   onRefresh: _loadMenusFromApi,
                   child: ListView(
+                    controller: _scrollController,
                     padding: const EdgeInsets.only(bottom: 120, top: 8),
                     children: [
                       // If Default mode -> show categories (but only items that exist in finalItems)
@@ -615,7 +625,14 @@ class _MenuPageState extends State<MenuPage> {
                                   crossAxisSpacing: 12,
                                   mainAxisSpacing: 16,
                                 ),
-                                itemBuilder: (_, i) => _buildMenuCard(visible[i]),
+                                itemBuilder: (_, i) {
+                                return AnimatedRowOnScroll(
+                                  index: i,
+                                  scrollController: _scrollController,
+                                  child: _buildMenuCard(visible[i]),
+                                );
+                              },
+
                               ),
                             ],
                           );
@@ -665,7 +682,14 @@ class _MenuPageState extends State<MenuPage> {
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 16,
                           ),
-                          itemBuilder: (_, i) => _buildMenuCard(finalItems[i]),
+                          itemBuilder: (_, i) {
+                            return AnimatedRowOnScroll(
+                              index: i,
+                              scrollController: _scrollController,
+                              child: _buildMenuCard(finalItems[i]),
+                            );
+                          },
+
                         ),
                       ],
 
@@ -680,3 +704,70 @@ class _MenuPageState extends State<MenuPage> {
     );
   }
 }
+
+class AnimatedRowOnScroll extends StatefulWidget {
+  final Widget child;
+  final int index;
+  final ScrollController scrollController;
+  final int itemsPerRow;
+
+  const AnimatedRowOnScroll({
+    super.key,
+    required this.child,
+    required this.index,
+    required this.scrollController,
+    this.itemsPerRow = 2,
+  });
+
+  @override
+  State<AnimatedRowOnScroll> createState() => _AnimatedRowOnScrollState();
+}
+
+class _AnimatedRowOnScrollState extends State<AnimatedRowOnScroll> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_handleScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleScroll());
+  }
+
+  void _handleScroll() {
+    if (!mounted) return;
+
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+
+    final pos = box.localToGlobal(Offset.zero);
+    final screenH = MediaQuery.of(context).size.height;
+
+    final shouldShow =
+        pos.dy < screenH * 0.85 && pos.dy > -box.size.height;
+
+    if (shouldShow != _visible) {
+      setState(() => _visible = shouldShow);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_handleScroll);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 350),
+      opacity: _visible ? 1 : 0,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        offset: _visible ? Offset.zero : const Offset(0, 0.35),
+        child: widget.child,
+      ),
+    );
+  }
+}
+
