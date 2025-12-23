@@ -10,6 +10,8 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'struk_page.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../services/format.dart';
+
 
 enum OrderFinalStatus {
   menungguPembayaran,
@@ -28,6 +30,7 @@ class PesananPage extends StatefulWidget {
 
 class _PesananPageState extends State<PesananPage>
     with SingleTickerProviderStateMixin {
+      final ScrollController _scrollController = ScrollController();
   List<dynamic> orders = [];
   bool isLoading = true;
   String? errorMessage;
@@ -73,6 +76,8 @@ class _PesananPageState extends State<PesananPage>
       socket?.disconnect();
       socket?.dispose();
     } catch (_) {}
+
+      _scrollController.dispose();
     super.dispose();
   }
 
@@ -641,7 +646,8 @@ if (img.isNotEmpty && !img.startsWith("http")) {
         elevation: 4,
       ),
 
-      body: ListView.builder(
+      body: ListView.builder( 
+        controller: _scrollController,
         padding: const EdgeInsets.all(16),
         itemCount: orders.length,
         itemBuilder: (context, i) {
@@ -654,32 +660,35 @@ if (img.isNotEmpty && !img.startsWith("http")) {
           bool reviewed = order["reviewed"] == true;
 
 
-          return _OrderCard(
-           tanggal: tanggal,
-            pesananText: pesananText,
-            payment: order["payment"] ?? "",
-            method: order["method"] ?? "",
-            totalAmount: order["totalAmount"] ?? 0,
-            finalStatus: finalStatus,
-            onBayarSekarang: () => bayarSekarang(order["_id"]),
-            reviewed: reviewed,
-            onTapDetail: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => StrukPage(order: order),
-                ),
-              );
-            },
-            onBeliLagi: () => beliLagi(order),
-            onBeriRating: () async {
-              // jika sudah review, tampilkan; jika belum, beri rating
-              if (order["reviewed"] == true) {
-                await lihatRating(order);
-              } else {
-                await beriRating(order);
-              }
-            },
+          return AnimatedItemOnScroll(
+            index: i,
+            scrollController: _scrollController,
+            child: _OrderCard(
+              tanggal: tanggal,
+              pesananText: pesananText,
+              payment: order["payment"] ?? "",
+              method: order["method"] ?? "",
+              totalAmount: order["totalAmount"] ?? 0,
+              finalStatus: finalStatus,
+              onBayarSekarang: () => bayarSekarang(order["_id"]),
+              reviewed: reviewed,
+              onTapDetail: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => StrukPage(order: order),
+                  ),
+                );
+              },
+              onBeliLagi: () => beliLagi(order),
+              onBeriRating: () async {
+                if (order["reviewed"] == true) {
+                  await lihatRating(order);
+                } else {
+                  await beriRating(order);
+                }
+              },
+            ),
           );
         },
       ),
@@ -842,15 +851,13 @@ class _OrderCardState extends State<_OrderCard> {
               Text("Pembayaran: ${widget.payment} | Layanan: ${widget.method}"),
               const SizedBox(height: 12),
               Text(
-                "Total: Rp ${widget.totalAmount.toString().replaceAllMapped(
-                  RegExp(r'\\B(?=(\\d{3})+(?!\\d))'),
-                  (m) => '.',
-                )}",
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
+                  "Total: ${FormatHelper.price(widget.totalAmount.toDouble())}",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
                 ),
-              ),
+
 
               const SizedBox(height: 12),
 
@@ -939,6 +946,71 @@ class _OrderCardState extends State<_OrderCard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class AnimatedItemOnScroll extends StatefulWidget {
+  final Widget child;
+  final int index;
+  final ScrollController scrollController;
+
+  const AnimatedItemOnScroll({
+    super.key,
+    required this.child,
+    required this.index,
+    required this.scrollController,
+  });
+
+  @override
+  State<AnimatedItemOnScroll> createState() => _AnimatedItemOnScrollState();
+}
+
+class _AnimatedItemOnScrollState extends State<AnimatedItemOnScroll> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_handleScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleScroll());
+  }
+
+  void _handleScroll() {
+    if (!mounted) return;
+
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+
+    final pos = box.localToGlobal(Offset.zero);
+    final screenH = MediaQuery.of(context).size.height;
+
+    final shouldShow =
+        pos.dy < screenH * 0.85 && pos.dy > -box.size.height;
+
+    if (shouldShow != _visible) {
+      setState(() => _visible = shouldShow);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_handleScroll);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 320),
+      opacity: _visible ? 1 : 0,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        offset: _visible ? Offset.zero : const Offset(0, 0.35),
+        child: widget.child,
       ),
     );
   }
