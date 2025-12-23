@@ -160,7 +160,9 @@ class HomePage extends StatefulWidget {
 
 
 class _HomePageState extends State<HomePage> {
-  
+
+  final ScrollController _scrollController = ScrollController();
+
   // ====== Banner Slider ======
   late PageController _pageController;
   int _currentPage = 0;
@@ -223,6 +225,7 @@ int currentTextIndex = 0;
 
   @override
   void dispose() {
+     _scrollController.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -439,6 +442,8 @@ int currentTextIndex = 0;
     final bool showingSearch = searchQuery.isNotEmpty;
 
     return SingleChildScrollView(
+      controller: _scrollController,
+      
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -619,20 +624,16 @@ int currentTextIndex = 0;
           const SizedBox(height: 20),
 
           // HEADER
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                showingSearch
-                    ? "Hasil Pencarian"
-                    : selectedCategory.isNotEmpty
-                        ? selectedCategory
-                        : "Menu Rekomendasi",
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              showingSearch ? "Hasil Pencarian" : "Menu Rekomendasi",
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
+          ),
 
           const SizedBox(height: 12),
 
@@ -663,7 +664,12 @@ int currentTextIndex = 0;
                 itemCount: searchResults.length,
                 itemBuilder: (context, index) {
                   final f = searchResults[index];
-                  return _buildMenuCard(f);
+                  return AnimatedRowOnScroll(
+                  index: index, 
+                  scrollController: _scrollController,
+                  child: _buildMenuCard(f),
+                );
+
                 },
               ),
             )
@@ -687,10 +693,15 @@ int currentTextIndex = 0;
                 mainAxisSpacing: 16,
               ),
               itemCount: recommendedMenus.length,
-              itemBuilder: (context, index) {
-                final f = recommendedMenus[index];
-                return _buildMenuCard(f);
-              },
+             itemBuilder: (context, index) {
+              final f = recommendedMenus[index];
+              return AnimatedRowOnScroll(
+                index: index,
+                scrollController: _scrollController,
+                child: _buildMenuCard(f),
+              );
+            },
+
             ),
 
           const SizedBox(height: 80),
@@ -699,3 +710,78 @@ int currentTextIndex = 0;
     );
   }
 }
+
+class AnimatedRowOnScroll extends StatefulWidget {
+  final Widget child;
+  final int index;
+  final ScrollController scrollController;
+  final int itemsPerRow;
+
+  const AnimatedRowOnScroll({
+    super.key,
+    required this.child,
+    required this.index,
+    required this.scrollController,
+    this.itemsPerRow = 2,
+  });
+
+  @override
+  State<AnimatedRowOnScroll> createState() => _AnimatedRowOnScrollState();
+}
+
+ 
+class _AnimatedRowOnScrollState extends State<AnimatedRowOnScroll> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_handleScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleScroll());
+  }
+
+  void _handleScroll() {
+    if (!mounted) return;
+
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+
+    final position = box.localToGlobal(Offset.zero);
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    final rowIndex = widget.index ~/ widget.itemsPerRow;
+
+    // posisi threshold (seperti carousel)
+    final triggerOffset = screenHeight * 0.85;
+
+    final shouldShow =
+        position.dy < triggerOffset && position.dy > -box.size.height;
+
+    if (shouldShow != _visible) {
+      setState(() {
+        _visible = shouldShow;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_handleScroll);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 350),
+      opacity: _visible ? 1 : 0,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        offset: _visible ? Offset.zero : const Offset(0, 0.25),
+        child: widget.child,
+      ),
+    );
+  }
+}
+
